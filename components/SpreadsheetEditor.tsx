@@ -36,11 +36,14 @@ export default function SpreadsheetEditor({
     loadFile,
     exportToExcel,
     exportToODS,
+    exportToCSV,
   } = useCanvasSpreadsheet();
 
   const [isDirty, setIsDirty] = useState(false);
-  const workbookRef = useRef<unknown>(null);
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const workbookRef = useRef<any>(null);
   const prevDataRef = useRef<unknown>(null);
+  const hasProvidedEvaluator = useRef(false);
 
   // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
   const getColumnLetter = useCallback((index: number): string => {
@@ -107,9 +110,10 @@ export default function SpreadsheetEditor({
     }
   }, [sheets, onDataLoaded, convertFortuneSheetToSpreadsheetData]);
 
-  // Provide a simple formula evaluator for backward compatibility
+  // Provide a simple formula evaluator for backward compatibility - only once
   useEffect(() => {
-    if (onEvaluateFormulaReady) {
+    if (onEvaluateFormulaReady && !hasProvidedEvaluator.current) {
+      hasProvidedEvaluator.current = true;
       const evaluateFormula = (formula: string) => {
         // Basic formula evaluation - Fortune Sheet handles this internally
         // This is a stub for backward compatibility
@@ -117,7 +121,7 @@ export default function SpreadsheetEditor({
       };
       onEvaluateFormulaReady(evaluateFormula);
     }
-  }, [onEvaluateFormulaReady]);
+  }, []); // Empty deps - only run once
 
   // Handle sheet changes
   const handleChange = useCallback((data: Sheet[]) => {
@@ -191,20 +195,12 @@ export default function SpreadsheetEditor({
             </button>
           )}
           <button
-            onClick={() => exportToExcel(fileName || 'export')}
+            onClick={() => setShowDownloadDialog(true)}
             className="px-3 py-1.5 text-sm flex items-center gap-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            title="Export to Excel"
+            title="Download Spreadsheet"
           >
             <Download size={14} />
-            XLSX
-          </button>
-          <button
-            onClick={() => exportToODS(fileName || 'export')}
-            className="px-3 py-1.5 text-sm flex items-center gap-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            title="Export to ODS (LibreOffice)"
-          >
-            <Download size={14} />
-            ODS
+            Download
           </button>
           {onFullscreenToggle && (
             <button
@@ -228,7 +224,7 @@ export default function SpreadsheetEditor({
           row={100}
           allowEdit={true}
           showToolbar={true}
-          showFormulaBar={false}
+          showFormulaBar={true}
           showSheetTabs={true}
           lang="en"
           hooks={{
@@ -238,6 +234,51 @@ export default function SpreadsheetEditor({
           }}
         />
       </div>
+
+      {/* Download Format Dialog */}
+      {showDownloadDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-xl" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            <h3 className="text-lg font-medium mb-4" style={{ color: 'var(--text-primary)' }}>Choose Download Format</h3>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => { 
+                  exportToExcel(fileName || 'export'); 
+                  setShowDownloadDialog(false); 
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Excel (.xlsx)
+              </button>
+              <button 
+                onClick={() => { 
+                  exportToODS(fileName || 'export'); 
+                  setShowDownloadDialog(false); 
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                LibreOffice (.ods)
+              </button>
+              <button 
+                onClick={() => { 
+                  exportToCSV(fileName || 'export'); 
+                  setShowDownloadDialog(false); 
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                CSV (.csv)
+              </button>
+            </div>
+            <button 
+              onClick={() => setShowDownloadDialog(false)} 
+              className="mt-4 text-sm hover:text-gray-700"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

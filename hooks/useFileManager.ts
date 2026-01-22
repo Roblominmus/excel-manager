@@ -109,12 +109,13 @@ export function useFileManager() {
         }
       });
 
-      setState({
+      setState((prev) => ({
+        ...prev,
         folders: rootFolders,
         currentFolder: null,
         loading: false,
         error: null,
-      });
+      }));
     } catch (error: any) {
       console.error('[FileManager] Error fetching hierarchy:', error);
       setState((prev) => ({

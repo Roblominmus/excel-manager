@@ -49,12 +49,13 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
     const saved = localStorage.getItem('savedFormulas');
     if (saved) {
       try {
-        setSavedFormulas(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSavedFormulas(parsed);
       } catch (e) {
         console.error('Failed to load saved formulas:', e);
       }
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save formula to localStorage
   const saveFormula = useCallback((formula: string, description: string) => {
@@ -278,7 +279,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
               {message.role === 'assistant' ? (
                 <ReactMarkdown
                   components={{
-                    code({ node, inline, className, children, ...props }: any) {
+                    code({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode; [key: string]: unknown }) {
                       const match = /language-(\w+)/.exec(className || '');
                       return !inline && match ? (
                         <SyntaxHighlighter 
@@ -376,7 +377,13 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              // Only update state if value actually changed
+              if (newValue !== input) {
+                setInput(newValue);
+              }
+            }}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask me to create formulas..."
             disabled={!spreadsheetData || loading}
