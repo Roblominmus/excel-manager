@@ -44,6 +44,7 @@ export default function SpreadsheetEditor({
   const workbookRef = useRef<any>(null);
   const prevDataRef = useRef<unknown>(null);
   const hasProvidedEvaluator = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
   const getColumnLetter = useCallback((index: number): string => {
@@ -121,7 +122,7 @@ export default function SpreadsheetEditor({
       };
       onEvaluateFormulaReady(evaluateFormula);
     }
-  }, []); // Empty deps - only run once
+  }, [onEvaluateFormulaReady]); // Run when callback changes
 
   // Handle sheet changes
   const handleChange = useCallback((data: Sheet[]) => {
@@ -131,6 +132,37 @@ export default function SpreadsheetEditor({
       onDataChange(converted.rows, true);
     }
   }, [onDataChange, convertFortuneSheetToSpreadsheetData]);
+
+  // Add bidirectional scrolling support with wheel events
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Find the spreadsheet container
+      const spreadsheetContainer = container.querySelector('.luckysheet-grid-container, [class*="fortune-sheet"], .luckysheet');
+      if (!spreadsheetContainer) return;
+
+      // Allow default scrolling behavior - the spreadsheet should handle this
+      // But ensure both horizontal and vertical scrolling work
+      if (e.shiftKey) {
+        // Shift + wheel for horizontal scrolling
+        e.preventDefault();
+        spreadsheetContainer.scrollLeft += e.deltaY;
+      } else if (Math.abs(e.deltaX) > 0) {
+        // Horizontal scroll from trackpad
+        e.preventDefault();
+        spreadsheetContainer.scrollLeft += e.deltaX;
+        spreadsheetContainer.scrollTop += e.deltaY;
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -173,7 +205,7 @@ export default function SpreadsheetEditor({
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Toolbar */}
-      <div className="px-3 py-2 flex items-center justify-between border-b border-gray-200 bg-gray-50">
+      <div className="px-3 py-2 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
         <div className="flex items-center gap-3">
           <span className="font-medium text-sm text-gray-900">
             {fileName || 'Untitled'}
@@ -215,7 +247,7 @@ export default function SpreadsheetEditor({
       </div>
 
       {/* Fortune Sheet Canvas */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div ref={containerRef} className="flex-1 overflow-hidden" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <Workbook
           ref={workbookRef}
           data={sheets}

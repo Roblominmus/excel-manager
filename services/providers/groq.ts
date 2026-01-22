@@ -68,20 +68,49 @@ Analyze the spreadsheet data and generate the appropriate Excel formula. If the 
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const content = data.choices?.[0]?.message?.content;
     
     if (!content) {
       throw new Error('No content in Groq response');
     }
 
-    // Parse the JSON response
-    const parsed = JSON.parse(content);
+    // Parse the JSON response with error handling
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      // If JSON parsing fails, try to extract code from markdown blocks
+      const codeMatch = content.match(/```(?:excel|formula)?\n?(.*?)\n?```/s);
+      if (codeMatch) {
+        return {
+          success: true,
+          type: 'formula',
+          code: codeMatch[1].trim(),
+          explanation: content.replace(/```(?:excel|formula)?\n?.*?\n?```/s, '').trim(),
+          provider: 'Groq',
+        };
+      }
+      
+      // Return content as explanation if we can't parse it
+      return {
+        success: true,
+        type: 'formula',
+        code: '',
+        explanation: content,
+        provider: 'Groq',
+      };
+    }
+    
+    // Validate parsed response
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Invalid response format from Groq');
+    }
     
     return {
       success: true,
-      type: parsed.type,
-      code: parsed.code,
-      explanation: parsed.explanation,
+      type: parsed.type || 'formula',
+      code: parsed.code || '',
+      explanation: parsed.explanation || 'No explanation provided',
       provider: 'Groq',
     };
   } catch (error: unknown) {

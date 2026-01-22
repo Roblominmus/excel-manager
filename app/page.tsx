@@ -7,7 +7,7 @@ import SpreadsheetEditor from '@/components/SpreadsheetEditor';
 import AIAssistant from '@/components/AIAssistant';
 import TabBar from '@/components/TabBar';
 import { SpreadsheetData, OpenFile } from '@/types/spreadsheet';
-import { isAuthenticated, getCurrentUserId } from '@/lib/supabase/client';
+import { isAuthenticated, getCurrentUserId, supabase } from '@/lib/supabase/client';
 import { Sun, Moon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Home() {
@@ -52,10 +52,8 @@ export default function Home() {
     // Update document attribute immediately
     document.documentElement.setAttribute('data-theme', initialTheme);
     // Set state after DOM update to avoid re-render issues
-    if (theme !== initialTheme) {
-      setTheme(initialTheme);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setTheme(initialTheme);
+  }, []); // Run only once on mount
 
   // Toggle theme
   const toggleTheme = useCallback(() => {
@@ -157,12 +155,82 @@ export default function Home() {
   // Save function with toast notification
   const handleSave = useCallback(async () => {
     const currentFile = openFiles.find(f => f.id === activeFileId);
-    if (!currentFile) return;
+    if (!currentFile || !userId) return;
     
     try {
-      // Note: Save functionality requires Supabase API integration
-      // to update files in storage. This is a placeholder for future implementation.
-      // await uploadFileToSupabase(currentFile.url, currentFile.data);
+      // Extract file record from database using the URL
+      // The URL contains the storage path after the signed URL parameters
+      const storagePath = currentFile.url.split('/').pop()?.split('?')[0];
+      if (!storagePath) {
+        throw new Error('Could not determine file path');
+      }
+
+      // Get the file record from database
+      const { data: fileRecords, error: fetchError } = await (supabase as any)
+        .from('files')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('storage_path', storagePath)
+        .limit(1);
+
+      if (fetchError) throw fetchError;
+      if (!fileRecords || fileRecords.length === 0) {
+        throw new Error('File record not found in database');
+      }
+
+      const fileRecord = fileRecords[0];
+
+      // Convert the spreadsheet data to a file format
+      // This requires getting the sheet data from SpreadsheetEditor
+      // For now, we'll use ExcelJS to export the data
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      
+      // Get the current sheet data - we need to pass this from SpreadsheetEditor
+      // For now, use the stored data if available
+      if (currentFile.data) {
+        const worksheet = workbook.addWorksheet('Sheet1');
+        const data = currentFile.data as any;
+        
+        // Add headers
+        if (data.headers && data.headers.length > 0) {
+          worksheet.addRow(data.headers);
+        }
+        
+        // Add rows
+        if (data.rows && data.rows.length > 0) {
+          data.rows.forEach((row: any) => {
+            worksheet.addRow(row);
+          });
+        }
+      }
+      
+      // Generate file buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
+      // Upload to Supabase storage (update existing file)
+      const { error: uploadError } = await supabase.storage
+        .from('spreadsheets')
+        .update(fileRecord.storage_path, blob, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Update file metadata in database (update timestamp)
+      const { error: updateError } = await (supabase as any)
+        .from('files')
+        .update({ 
+          updated_at: new Date().toISOString(),
+          size: blob.size,
+        })
+        .eq('id', fileRecord.id);
+
+      if (updateError) throw updateError;
       
       setOpenFiles(prev => 
         prev.map(f => 
@@ -171,12 +239,15 @@ export default function Home() {
       );
       setToast({ message: 'Changes saved successfully!', type: 'success' });
       setTimeout(() => setToast(null), 3000);
+      
+      // Trigger file manager refresh to show updated file
+      // This will be handled by FileManager's fetchFolderHierarchy
     } catch (error) {
       console.error('Save error:', error);
-      setToast({ message: 'Failed to save changes', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      setToast({ message: `Failed to save changes: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error' });
+      setTimeout(() => setToast(null), 5000);
     }
-  }, [openFiles, activeFileId]);
+  }, [openFiles, activeFileId, userId]);
 
   // Handle data changes with auto-save
   const handleDataChange = useCallback((data: unknown[][], isDirty: boolean) => {

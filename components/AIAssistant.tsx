@@ -55,7 +55,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
         console.error('Failed to load saved formulas:', e);
       }
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Save formula to localStorage
   const saveFormula = useCallback((formula: string, description: string) => {
@@ -102,7 +102,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
       role: 'assistant',
       content: response.success
         ? `${response.explanation}\n\n\`\`\`excel\n${response.code}\n\`\`\``
-        : `Error: ${response.error}`,
+        : `I encountered an issue processing your request.\n\n**Error**: ${response.error}\n\n**Tip**: Try rephrasing your question or ensure you have a spreadsheet loaded with data.`,
       provider: response.provider,
       code: response.success ? response.code : undefined,
     };
