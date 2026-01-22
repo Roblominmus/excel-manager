@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { makeAIRequest, extractSchema } from '@/services/ai-service';
-import { AIResponse, SpreadsheetSchema } from '@/types/ai';
+import { AIResponse } from '@/types/ai';
 
 export function useAIAssistant() {
   const [loading, setLoading] = useState(false);
@@ -12,14 +11,21 @@ export function useAIAssistant() {
     setLoading(true);
 
     try {
-      // Extract schema WITHOUT actual data (security constraint)
-      const schema: SpreadsheetSchema = extractSchema(headers, firstRow);
+      // Call the API route instead of the service directly
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, headers, firstRow }),
+      });
 
-      // Make AI request with waterfall fallback
-      const response = await makeAIRequest(query, schema);
-      
-      setLastResponse(response);
-      return response;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API request failed with status ${response.status}`);
+      }
+
+      const data: AIResponse = await response.json();
+      setLastResponse(data);
+      return data;
     } catch (error: any) {
       const errorResponse: AIResponse = {
         success: false,
