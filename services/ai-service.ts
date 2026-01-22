@@ -14,11 +14,13 @@ import { makeDeepSeekRequest } from './providers/deepseek';
 import { makeCohereRequest } from './providers/cohere';
 import { makeGroqRequest } from './providers/groq';
 import { makeXAIRequest } from './providers/xai';
+import { makeOpenAIRequest } from './providers/openai';
 
 /**
  * Provider configuration in priority order
  */
 const PROVIDERS = [
+  { name: 'OpenAI', handler: makeOpenAIRequest },
   { name: 'Groq', handler: makeGroqRequest },
   { name: 'DeepSeek', handler: makeDeepSeekRequest },
   { name: 'X.AI', handler: makeXAIRequest },

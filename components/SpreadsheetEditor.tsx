@@ -40,13 +40,15 @@ export default function SpreadsheetEditor({
   const [formulaBarValue, setFormulaBarValue] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const gridRef = useRef<any>(null);
+  const prevDataRef = useRef<SpreadsheetData | null>(null);
   
   // Notify parent when data is loaded
   useEffect(() => {
-    if (data && onDataLoaded) {
+    if (data && onDataLoaded && data !== prevDataRef.current) {
+      prevDataRef.current = data;
       onDataLoaded(data);
     }
-  }, [data, onDataLoaded]);
+  }, [data]); // Removed onDataLoaded from dependencies to prevent infinite loop
 
   // Convert data to DataGrid format
   const rows = useMemo(() => {

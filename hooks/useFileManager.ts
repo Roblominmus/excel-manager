@@ -316,6 +316,28 @@ export function useFileManager() {
   );
 
   /**
+   * Rename a file
+   */
+  const renameFile = useCallback(
+    async (fileId: string, newName: string) => {
+      try {
+        const { error } = await (supabase as any)
+          .from('files')
+          .update({ name: newName })
+          .eq('id', fileId);
+
+        if (error) throw error;
+
+        await fetchFolderHierarchy();
+      } catch (error: any) {
+        console.error('[FileManager] Error renaming file:', error);
+        throw error;
+      }
+    },
+    [fetchFolderHierarchy]
+  );
+
+  /**
    * Move a file to a different folder
    */
   const moveFile = useCallback(
@@ -400,6 +422,7 @@ export function useFileManager() {
     uploadFile,
     downloadFile,
     deleteFile,
+    renameFile,
     moveFile,
     getFilesInFolder,
     getFileUrl,
