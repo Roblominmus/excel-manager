@@ -16,9 +16,37 @@ interface UploadProgress {
  * Integrates with useFileManager for metadata tracking
  */
 export function useFileUpload(userId: string, parentFolderId?: string) {
-  const { uploadFile: uploadFileToManager } = useFileManager();
+  const { uploadFile: uploadFileToManager, getFilesInFolder } = useFileManager();
   const [uploads, setUploads] = useState<Record<string, UploadProgress>>({});
   const [isUploading, setIsUploading] = useState(false);
+
+  /**
+   * Get unique filename by adding (1), (2), etc. if name already exists
+   */
+  const getUniqueFileName = useCallback(
+    async (name: string, folderId: string | null): Promise<string> => {
+      try {
+        const existingFiles = await getFilesInFolder(folderId);
+        const names = existingFiles.map((f: any) => f.name);
+        
+        if (!names.includes(name)) return name;
+        
+        const ext = name.includes('.') ? '.' + name.split('.').pop() : '';
+        const baseName = name.replace(new RegExp(ext + '$'), '');
+        let counter = 1;
+        
+        while (names.includes(`${baseName}(${counter})${ext}`)) {
+          counter++;
+        }
+        
+        return `${baseName}(${counter})${ext}`;
+      } catch (error) {
+        console.error('Error checking for duplicate filenames:', error);
+        return name; // Fallback to original name
+      }
+    },
+    [getFilesInFolder]
+  );
 
   const uploadFile = useCallback(
     async (file: File, targetFolderId?: string | null) => {
@@ -32,6 +60,14 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
       setIsUploading(true);
 
       try {
+        // Get unique filename to avoid duplicates
+        const uniqueFileName = await getUniqueFileName(file.name, folderId);
+        
+        // Create a new file with the unique name if needed
+        const fileToUpload = uniqueFileName !== file.name
+          ? new File([file], uniqueFileName, { type: file.type })
+          : file;
+
         // Simulate progress (Supabase doesn't provide real-time progress for now)
         setUploads(prev => ({
           ...prev,
@@ -39,7 +75,7 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
         }));
 
         // Upload via useFileManager hook
-        await uploadFileToManager(file, folderId);
+        await uploadFileToManager(fileToUpload, folderId);
 
         setUploads(prev => ({
           ...prev,
@@ -60,7 +96,7 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
         throw error;
       }
     },
-    [uploadFileToManager, parentFolderId]
+    [uploadFileToManager, parentFolderId, getUniqueFileName]
   );
 
   const uploadMultipleFiles = useCallback(

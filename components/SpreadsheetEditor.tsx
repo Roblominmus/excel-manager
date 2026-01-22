@@ -40,13 +40,15 @@ export default function SpreadsheetEditor({
   const [formulaBarValue, setFormulaBarValue] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const gridRef = useRef<any>(null);
+  const dataLoadedRef = useRef<string | null>(null);
   
-  // Notify parent when data is loaded
+  // Notify parent when data is loaded (only once per file)
   useEffect(() => {
-    if (data && onDataLoaded) {
+    if (data && onDataLoaded && fileUrl && dataLoadedRef.current !== fileUrl) {
+      dataLoadedRef.current = fileUrl;
       onDataLoaded(data);
     }
-  }, [data, onDataLoaded]);
+  }, [data, fileUrl, onDataLoaded]);
 
   // Convert data to DataGrid format
   const rows = useMemo(() => {
