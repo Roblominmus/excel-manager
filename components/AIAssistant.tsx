@@ -278,7 +278,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
               {message.role === 'assistant' ? (
                 <ReactMarkdown
                   components={{
-                    code({ inline, className, children, ...props }) {
+                    code({ node, inline, className, children, ...props }: any) {
                       const match = /language-(\w+)/.exec(className || '');
                       return !inline && match ? (
                         <SyntaxHighlighter 

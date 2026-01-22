@@ -165,3 +165,31 @@ input:focus-visible {
   font-weight: 600;
   color: var(--text-primary);
 }
+
+/* Fortune Sheet Customizations */
+.fortune-sheet-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.luckysheet-wa-editor {
+  font-family: var(--font-sans) !important;
+}
+
+/* Dark mode support for Fortune Sheet */
+[data-theme="dark"] .fortune-sheet-container {
+  --fortune-sheet-bg: #1e1e1e;
+  --fortune-sheet-cell-bg: #2d2d2d;
+  --fortune-sheet-header-bg: #252526;
+  --fortune-sheet-border: #3c3c3c;
+}
+
+[data-theme="dark"] .luckysheet-cell-main {
+  background-color: #2d2d2d !important;
+}
+
+[data-theme="dark"] .luckysheet-cols-h-cells,
+[data-theme="dark"] .luckysheet-rows-h-cells {
+  background-color: #252526 !important;
+  color: #d4d4d4 !important;
+}
