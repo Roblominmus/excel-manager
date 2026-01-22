@@ -43,12 +43,15 @@ export default function SpreadsheetEditor({
   const prevDataRef = useRef<SpreadsheetData | null>(null);
   
   // Notify parent when data is loaded
+  // Note: onDataLoaded is intentionally excluded from dependencies to prevent infinite loops
+  // when the parent component doesn't memoize the callback. The ref pattern ensures we only
+  // call onDataLoaded when data actually changes, not when the callback reference changes.
   useEffect(() => {
     if (data && onDataLoaded && data !== prevDataRef.current) {
       prevDataRef.current = data;
       onDataLoaded(data);
     }
-  }, [data]); // Removed onDataLoaded from dependencies to prevent infinite loop
+  }, [data]); // onDataLoaded intentionally excluded
 
   // Convert data to DataGrid format
   const rows = useMemo(() => {

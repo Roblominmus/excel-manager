@@ -28,13 +28,12 @@ export default function PromptDialog({
 }: PromptDialogProps) {
   const [value, setValue] = useState(defaultValue);
 
-  // Reset value when modal opens
+  // Reset value when modal opens or defaultValue changes
   useEffect(() => {
     if (isOpen) {
       setValue(defaultValue);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, defaultValue]);
 
   const handleConfirm = () => {
     if (value.trim()) {

@@ -10,7 +10,7 @@ export async function makeOpenAIRequest(
   query: string,
   schema: SpreadsheetSchema
 ): Promise<AIResponse> {
-  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   
   if (!apiKey) {
     return { 
@@ -65,18 +65,29 @@ Choose the most appropriate format based on the query.`;
       throw new Error('No response from OpenAI');
     }
 
-    // Detect response type
-    let type: AIResponse['type'] = 'transformation';
-    if (content.startsWith('=') || content.toLowerCase().includes('formula:')) {
-      type = 'formula';
-    }
+    // Try to parse as JSON first (structured response)
+    try {
+      const parsed = JSON.parse(content);
+      return {
+        success: true,
+        type: parsed.type || 'transformation',
+        code: parsed.code || content,
+        explanation: parsed.explanation,
+      };
+    } catch {
+      // If not JSON, detect response type from content
+      let type: AIResponse['type'] = 'transformation';
+      if (content.startsWith('=') || content.toLowerCase().includes('formula:')) {
+        type = 'formula';
+      }
 
-    return {
-      success: true,
-      type,
-      code: content,
-      explanation: content,
-    };
+      return {
+        success: true,
+        type,
+        code: content,
+        explanation: content,
+      };
+    }
   } catch (error: any) {
     console.error('[OpenAI Provider] Error:', error);
     return {
