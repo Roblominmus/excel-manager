@@ -12,8 +12,8 @@ interface SpreadsheetEditorProps {
   fileUrl?: string;
   fileName?: string;
   onDataLoaded?: (data: SpreadsheetData) => void;
-  onDataChange?: (data: any[][], isDirty: boolean) => void;
-  onEvaluateFormulaReady?: (evaluateFormula: (formula: string) => any) => void;
+  onDataChange?: (data: unknown[][], isDirty: boolean) => void;
+  onEvaluateFormulaReady?: (evaluateFormula: (formula: string) => unknown) => void;
   onSave?: () => void;
   onFullscreenToggle?: () => void;
   isFullscreen?: boolean;
@@ -35,13 +35,55 @@ export default function SpreadsheetEditor({
     error,
     loadFile,
     exportToExcel,
-    exportToCSV,
     exportToODS,
   } = useCanvasSpreadsheet();
 
   const [isDirty, setIsDirty] = useState(false);
-  const workbookRef = useRef<any>(null);
-  const prevDataRef = useRef<any>(null);
+  const workbookRef = useRef<unknown>(null);
+  const prevDataRef = useRef<unknown>(null);
+
+  // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
+  const getColumnLetter = useCallback((index: number): string => {
+    let letter = '';
+    let num = index + 1;
+    while (num > 0) {
+      const remainder = (num - 1) % 26;
+      letter = String.fromCharCode(65 + remainder) + letter;
+      num = Math.floor((num - 1) / 26);
+    }
+    return letter;
+  }, []);
+
+  // Convert Fortune Sheet format to SpreadsheetData for parent callbacks
+  const convertFortuneSheetToSpreadsheetData = useCallback((sheet: Sheet): SpreadsheetData => {
+    const maxRow = sheet.celldata?.reduce((max, cell) => Math.max(max, cell.r), 0) || 0;
+    const maxCol = sheet.celldata?.reduce((max, cell) => Math.max(max, cell.c), 0) || 0;
+    
+    // Create headers (A, B, C, ...)
+    const headers: string[] = [];
+    for (let i = 0; i <= maxCol; i++) {
+      headers.push(getColumnLetter(i));
+    }
+    
+    // Create rows array
+    const rows: unknown[][] = Array(maxRow + 1).fill(null).map(() => Array(maxCol + 1).fill(''));
+    
+    // Fill in cell data
+    sheet.celldata?.forEach((cell: { r: number; c: number; v: unknown }) => {
+      const value = typeof cell.v === 'object' && cell.v !== null && 'v' in cell.v ? (cell.v as { v: unknown }).v : cell.v;
+      rows[cell.r][cell.c] = value ?? '';
+    });
+    
+    return {
+      headers,
+      rows,
+      metadata: {
+        sheetName: sheet.name,
+        rowCount: rows.length,
+        columnCount: headers.length,
+      },
+    };
+  }, [getColumnLetter]);
 
   // Load file when URL changes
   useEffect(() => {
@@ -63,7 +105,7 @@ export default function SpreadsheetEditor({
       const convertedData = convertFortuneSheetToSpreadsheetData(firstSheet);
       onDataLoaded(convertedData);
     }
-  }, [sheets, onDataLoaded]);
+  }, [sheets, onDataLoaded, convertFortuneSheetToSpreadsheetData]);
 
   // Provide a simple formula evaluator for backward compatibility
   useEffect(() => {
@@ -77,49 +119,6 @@ export default function SpreadsheetEditor({
     }
   }, [onEvaluateFormulaReady]);
 
-  // Convert Fortune Sheet format to SpreadsheetData for parent callbacks
-  const convertFortuneSheetToSpreadsheetData = (sheet: Sheet): SpreadsheetData => {
-    const maxRow = sheet.celldata?.reduce((max, cell) => Math.max(max, cell.r), 0) || 0;
-    const maxCol = sheet.celldata?.reduce((max, cell) => Math.max(max, cell.c), 0) || 0;
-    
-    // Create headers (A, B, C, ...)
-    const headers: string[] = [];
-    for (let i = 0; i <= maxCol; i++) {
-      headers.push(getColumnLetter(i));
-    }
-    
-    // Create rows array
-    const rows: any[][] = Array(maxRow + 1).fill(null).map(() => Array(maxCol + 1).fill(''));
-    
-    // Fill in cell data
-    sheet.celldata?.forEach((cell: any) => {
-      const value = typeof cell.v === 'object' ? cell.v.v : cell.v;
-      rows[cell.r][cell.c] = value ?? '';
-    });
-    
-    return {
-      headers,
-      rows,
-      metadata: {
-        sheetName: sheet.name,
-        rowCount: rows.length,
-        columnCount: headers.length,
-      },
-    };
-  };
-
-  // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
-  const getColumnLetter = (index: number): string => {
-    let letter = '';
-    let num = index + 1;
-    while (num > 0) {
-      const remainder = (num - 1) % 26;
-      letter = String.fromCharCode(65 + remainder) + letter;
-      num = Math.floor((num - 1) / 26);
-    }
-    return letter;
-  };
-
   // Handle sheet changes
   const handleChange = useCallback((data: Sheet[]) => {
     setIsDirty(true);
@@ -127,7 +126,7 @@ export default function SpreadsheetEditor({
       const converted = convertFortuneSheetToSpreadsheetData(data[0]);
       onDataChange(converted.rows, true);
     }
-  }, [onDataChange]);
+  }, [onDataChange, convertFortuneSheetToSpreadsheetData]);
 
   if (loading) {
     return (
@@ -233,10 +232,10 @@ export default function SpreadsheetEditor({
           showSheetTabs={true}
           lang="en"
           hooks={{
-            afterCellMouseDown: (cell: any, cellInfo: any) => {
+            afterCellMouseDown: (_cell: unknown, _cellInfo: unknown) => {
               // Track cell selection for formula bar
             },
-            afterUpdateCell: (r: number, c: number, oldVal: any, newVal: any) => {
+            afterUpdateCell: (_r: number, _c: number, _oldVal: unknown, _newVal: unknown) => {
               setIsDirty(true);
             },
           }}

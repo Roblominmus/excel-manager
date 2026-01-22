@@ -35,16 +35,17 @@ export function useCanvasSpreadsheet() {
         
         const fortuneSheets: Sheet[] = [];
         
-        workbook.eachSheet((worksheet, sheetId) => {
+        workbook.eachSheet((worksheet, _sheetId) => {
           const sheet = convertExcelJSToFortuneSheet(worksheet);
           fortuneSheets.push(sheet);
         });
         
         setSheets(fortuneSheets.length > 0 ? fortuneSheets : [createEmptySheet()]);
       }
-    } catch (err: any) {
-      console.error('Error loading file:', err);
-      setError(err.message || 'Failed to load spreadsheet');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error loading file:', error);
+      setError(error.message || 'Failed to load spreadsheet');
       // Create empty sheet on error
       setSheets([createEmptySheet()]);
     } finally {
