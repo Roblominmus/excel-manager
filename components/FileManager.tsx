@@ -34,6 +34,7 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     getFilesInFolder,
     getFileUrl,
     fetchFolderHierarchy,
+    moveFile,
   } = useFileManagerHook();
   
   const [userId, setUserId] = useState<string | null>(providedUserId || null);
@@ -41,6 +42,15 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['root']));
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const prevIsUploading = useRef(isUploading);
+
+  // Refresh file hierarchy after uploads complete
+  useEffect(() => {
+    if (prevIsUploading.current && !isUploading) {
+      fetchFolderHierarchy();
+    }
+    prevIsUploading.current = isUploading;
+  }, [isUploading, fetchFolderHierarchy]);
 
   // Get current user if not provided
   useEffect(() => {
@@ -195,19 +205,23 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     setDragOverFolderId(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetFolder: TreeNode) => {
+  const handleDrop = async (e: React.DragEvent, targetFolder: TreeNode) => {
     e.preventDefault();
     setDragOverFolderId(null);
     
     if (targetFolder.type !== 'folder') return;
     
-    // Note: File/folder move functionality would require backend API support
-    // to update folder_id in the database. This is a placeholder for future implementation.
     const nodeId = e.dataTransfer.getData('nodeId');
     const nodeType = e.dataTransfer.getData('nodeType');
     
-    // Backend API call would go here:
-    // await moveFileToFolder(nodeId, targetFolder.id);
+    if (nodeType === 'file') {
+      try {
+        await moveFile(nodeId, targetFolder.id);
+        await fetchFolderHierarchy();
+      } catch (error) {
+        console.error('Failed to move file:', error);
+      }
+    }
   };
 
   const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
