@@ -6,7 +6,7 @@ import FileManager from '@/components/FileManager';
 import SpreadsheetEditor from '@/components/SpreadsheetEditor';
 import AIAssistant from '@/components/AIAssistant';
 import TabBar from '@/components/TabBar';
-import { SpreadsheetData, OpenFile } from '@/types/spreadsheet';
+import { OpenFile } from '@/types/spreadsheet';
 import { isAuthenticated, getCurrentUserId, supabase } from '@/lib/supabase/client';
 import { Sun, Moon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -166,7 +166,7 @@ export default function Home() {
       }
 
       // Get the file record from database
-      const { data: fileRecords, error: fetchError } = await (supabase as any)
+      const { data: fileRecords, error: fetchError } = await supabase
         .from('files')
         .select('*')
         .eq('user_id', userId)
@@ -178,7 +178,7 @@ export default function Home() {
         throw new Error('File record not found in database');
       }
 
-      const fileRecord = fileRecords[0];
+      const fileRecord = fileRecords[0] as { id: string; storage_path: string; [key: string]: unknown };
 
       // Convert the spreadsheet data to a file format
       // This requires getting the sheet data from SpreadsheetEditor
@@ -190,7 +190,7 @@ export default function Home() {
       // For now, use the stored data if available
       if (currentFile.data) {
         const worksheet = workbook.addWorksheet('Sheet1');
-        const data = currentFile.data as any;
+        const data = currentFile.data as { headers?: string[]; rows?: unknown[][] };
         
         // Add headers
         if (data.headers && data.headers.length > 0) {
@@ -199,7 +199,7 @@ export default function Home() {
         
         // Add rows
         if (data.rows && data.rows.length > 0) {
-          data.rows.forEach((row: any) => {
+          data.rows.forEach((row: unknown[]) => {
             worksheet.addRow(row);
           });
         }
@@ -222,13 +222,13 @@ export default function Home() {
       if (uploadError) throw uploadError;
 
       // Update file metadata in database (update timestamp)
-      const { error: updateError } = await (supabase as any)
+      const { error: updateError } = await (supabase
         .from('files')
         .update({ 
           updated_at: new Date().toISOString(),
           size: blob.size,
-        })
-        .eq('id', fileRecord.id);
+        } as never)
+        .eq('id', fileRecord.id));
 
       if (updateError) throw updateError;
       

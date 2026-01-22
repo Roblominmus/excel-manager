@@ -80,13 +80,13 @@ Analyze the spreadsheet data and generate the appropriate Excel formula. If the 
       parsed = JSON.parse(content);
     } catch (parseError) {
       // If JSON parsing fails, try to extract code from markdown blocks
-      const codeMatch = content.match(/```(?:excel|formula)?\n?(.*?)\n?```/s);
+      const codeMatch = content.match(/```(?:excel|formula)?\n?([\s\S]*?)\n?```/);
       if (codeMatch) {
         return {
           success: true,
           type: 'formula',
           code: codeMatch[1].trim(),
-          explanation: content.replace(/```(?:excel|formula)?\n?.*?\n?```/s, '').trim(),
+          explanation: content.replace(/```(?:excel|formula)?\n?[\s\S]*?\n?```/, '').trim(),
           provider: 'Groq',
         };
       }
