@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Folder, File, Plus, Upload } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useFileManager as useFileManagerHook } from '@/hooks/useFileManager';
 import { getCurrentUserId } from '@/lib/supabase/client';
@@ -9,7 +9,7 @@ import { getCurrentUserId } from '@/lib/supabase/client';
 interface FileManagerProps {
   userId?: string;
   currentFolderId?: string;
-  onFileSelect?: (url: string) => void;
+  onFileSelect?: (url: string, name?: string) => void;
 }
 
 interface TreeNode {
@@ -40,6 +40,7 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
   const [treeData, setTreeData] = useState<TreeNode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['root']));
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   // Get current user if not provided
   useEffect(() => {
@@ -132,6 +133,19 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     [uploadMultipleFiles]
   );
 
+  // Handle folder upload with webkitdirectory
+  const handleFolderInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) {
+        const selectedFiles = Array.from(e.target.files);
+        // Note: Full recursive folder creation would require backend API support
+        // For now, upload all files to root folder
+        uploadMultipleFiles(selectedFiles);
+      }
+    },
+    [uploadMultipleFiles]
+  );
+
   const toggleExpand = (nodeId: string) => {
     setExpandedIds(prev => {
       const newSet = new Set(prev);
@@ -149,7 +163,7 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     if (node.type === 'file' && node.storage_path && onFileSelect) {
       const url = await getFileUrl(node.storage_path);
       if (url) {
-        onFileSelect(url);
+        onFileSelect(url, node.name);
       }
     }
   };
@@ -160,20 +174,68 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, node: TreeNode) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('nodeId', node.id);
+    e.dataTransfer.setData('nodeType', node.type);
+  };
+
+  const handleDragOver = (e: React.DragEvent, node: TreeNode) => {
+    if (node.type === 'folder') {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDragOverFolderId(node.id);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverFolderId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetFolder: TreeNode) => {
+    e.preventDefault();
+    setDragOverFolderId(null);
+    
+    if (targetFolder.type !== 'folder') return;
+    
+    // Note: File/folder move functionality would require backend API support
+    // to update folder_id in the database. This is a placeholder for future implementation.
+    const nodeId = e.dataTransfer.getData('nodeId');
+    const nodeType = e.dataTransfer.getData('nodeType');
+    
+    // Backend API call would go here:
+    // await moveFileToFolder(nodeId, targetFolder.id);
+  };
+
   const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedIds.has(node.id);
     const isSelected = selectedId === node.id;
+    const isDragOver = dragOverFolderId === node.id;
     const hasChildren = node.children && node.children.length > 0;
 
     return (
       <div key={node.id}>
         <div
-          className={`flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-gray-100 ${
-            isSelected ? 'bg-blue-100' : ''
+          className={`flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors ${
+            isSelected 
+              ? 'bg-blue-100' 
+              : isDragOver
+              ? 'bg-blue-50'
+              : ''
           }`}
-          style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          style={{ 
+            paddingLeft: `${depth * 16 + 8}px`,
+            backgroundColor: isDragOver ? 'var(--primary)' : isSelected ? 'rgba(0, 102, 204, 0.1)' : 'transparent',
+            color: 'var(--text-primary)',
+          }}
           onClick={() => handleNodeClick(node)}
           onDoubleClick={() => handleNodeDoubleClick(node)}
+          draggable={true}
+          onDragStart={(e) => handleDragStart(e, node)}
+          onDragOver={(e) => handleDragOver(e, node)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, node)}
         >
           {node.type === 'folder' ? (
             <>
@@ -185,20 +247,20 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
                 className="p-0 hover:bg-gray-200"
               >
                 {isExpanded ? (
-                  <ChevronDown size={14} className="text-gray-600" />
+                  <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />
                 ) : (
-                  <ChevronRight size={14} className="text-gray-600" />
+                  <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
                 )}
               </button>
-              <Folder size={14} className="text-gray-600 flex-shrink-0" />
+              <Folder size={14} style={{ color: 'var(--text-secondary)' }} className="flex-shrink-0" />
             </>
           ) : (
             <>
-              <span className="w-[14px]" /> {/* Spacer for alignment */}
-              <File size={14} className="text-gray-600 flex-shrink-0" />
+              <span className="w-[14px]" />
+              <File size={14} style={{ color: 'var(--text-secondary)' }} className="flex-shrink-0" />
             </>
           )}
-          <span className="text-sm text-gray-900 truncate flex-1">{node.name}</span>
+          <span className="text-sm truncate flex-1">{node.name}</span>
         </div>
         {node.type === 'folder' && isExpanded && hasChildren && (
           <div>
@@ -210,10 +272,10 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Toolbar */}
-      <div className="border-b border-gray-200 px-3 py-2 flex items-center justify-between bg-gray-50">
-        <h2 className="text-sm font-medium text-gray-900">Files</h2>
+      <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
+        <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Files</h2>
         <div className="flex gap-1">
           <button
             onClick={() => {
@@ -226,7 +288,7 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
             className="p-1 hover:bg-gray-200 transition-colors"
             title="New Folder"
           >
-            <Plus size={16} className="text-gray-600" />
+            <Plus size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <label className="cursor-pointer p-1 hover:bg-gray-200 transition-colors" title="Upload Files">
             <input
@@ -235,7 +297,18 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
               onChange={handleFileInput}
               className="hidden"
             />
-            <Upload size={16} className="text-gray-600" />
+            <Upload size={16} style={{ color: 'var(--text-secondary)' }} />
+          </label>
+          <label className="cursor-pointer p-1 hover:bg-gray-200 transition-colors" title="Upload Folder">
+            <input
+              type="file"
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={handleFolderInput}
+              className="hidden"
+            />
+            <FolderUp size={16} style={{ color: 'var(--text-secondary)' }} />
           </label>
         </div>
       </div>
@@ -271,13 +344,13 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
         {loading ? (
           <div className="p-4 text-center">
             <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-900 mx-auto mb-2"></div>
-            <p className="text-xs text-gray-600">Loading...</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Loading...</p>
           </div>
         ) : treeData.length === 0 && !isUploading ? (
           <div className="p-4 text-center">
-            <File size={32} className="text-gray-300 mx-auto mb-2" />
-            <p className="text-xs text-gray-500">No files yet</p>
-            <p className="text-xs text-gray-400">Upload files to get started</p>
+            <File size={32} className="mx-auto mb-2" style={{ color: 'var(--gray-300)' }} />
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No files yet</p>
+            <p className="text-xs" style={{ color: 'var(--gray-400)' }}>Upload files to get started</p>
           </div>
         ) : (
           <div className="py-1">

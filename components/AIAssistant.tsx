@@ -64,59 +64,59 @@ export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistan
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3 bg-gray-50">
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
         <div className="flex items-center gap-2">
-          <Bot className="text-gray-600" size={16} />
-          <h3 className="font-medium text-gray-900 text-sm">AI Assistant</h3>
+          <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
+          <h3 className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>AI Assistant</h3>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
           Privacy: Only sees column headers
         </p>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: 'var(--bg-primary)' }}>
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {message.role === 'assistant' && (
-              <div className="w-6 h-6 bg-gray-200 flex items-center justify-center flex-shrink-0 mt-1">
-                <Bot size={14} className="text-gray-600" />
+              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 mt-1" style={{ backgroundColor: 'var(--gray-200)' }}>
+                <Bot size={14} style={{ color: 'var(--text-secondary)' }} />
               </div>
             )}
             <div
-              className={`max-w-[85%] px-3 py-2 text-sm ${
-                message.role === 'user'
-                  ? 'bg-blue-100 text-gray-900'
-                  : 'bg-gray-100 text-gray-900'
-              }`}
+              className={`max-w-[85%] px-3 py-2 text-sm`}
+              style={{
+                backgroundColor: message.role === 'user' ? 'rgba(0, 102, 204, 0.1)' : 'var(--gray-100)',
+                color: 'var(--text-primary)',
+              }}
             >
               <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
               {message.provider && (
-                <p className="text-xs mt-1 text-gray-500">via {message.provider}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>via {message.provider}</p>
               )}
             </div>
             {message.role === 'user' && (
-              <div className="w-6 h-6 bg-gray-300 flex items-center justify-center flex-shrink-0 mt-1">
-                <User size={14} className="text-gray-700" />
+              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 mt-1" style={{ backgroundColor: 'var(--gray-300)' }}>
+                <User size={14} style={{ color: 'var(--text-primary)' }} />
               </div>
             )}
           </div>
         ))}
         {loading && (
           <div className="flex gap-2 justify-start">
-            <div className="w-6 h-6 bg-gray-200 flex items-center justify-center">
-              <Bot size={14} className="text-gray-600" />
+            <div className="w-6 h-6 flex items-center justify-center" style={{ backgroundColor: 'var(--gray-200)' }}>
+              <Bot size={14} style={{ color: 'var(--text-secondary)' }} />
             </div>
-            <div className="bg-gray-100 px-3 py-2">
+            <div className="px-3 py-2" style={{ backgroundColor: 'var(--gray-100)' }}>
               <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: 'var(--gray-400)' }}></div>
+                <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: 'var(--gray-400)', animationDelay: '150ms' }}></div>
+                <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: 'var(--gray-400)', animationDelay: '300ms' }}></div>
               </div>
             </div>
           </div>
@@ -124,7 +124,7 @@ export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistan
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 bg-white p-3">
+      <div className="p-3" style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)' }}>
         {!spreadsheetData && (
           <div className="mb-2 bg-yellow-50 border border-yellow-200 p-2 text-xs text-yellow-900">
             Open a spreadsheet to use AI assistance
@@ -138,7 +138,12 @@ export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistan
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask me to create formulas..."
             disabled={!spreadsheetData || loading}
-            className="flex-1 px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
           />
           <button
             onClick={handleSend}
