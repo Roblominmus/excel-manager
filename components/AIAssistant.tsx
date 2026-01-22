@@ -25,7 +25,7 @@ interface SavedFormula {
 
 interface AIAssistantProps {
   spreadsheetData?: SpreadsheetData;
-  evaluateFormula?: (formula: string) => any;
+  evaluateFormula?: (formula: string) => unknown;
   onApplyCode?: (code: string, type: 'formula' | 'transformation') => void;
   onClose?: () => void;
 }
@@ -56,24 +56,25 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
   }, []);
 
   // Save formula to localStorage
-  const saveFormula = (formula: string, description: string) => {
+  const saveFormula = useCallback((formula: string, description: string) => {
+    const timestamp = Date.now();
     const newFormula: SavedFormula = {
-      id: Date.now().toString(),
+      id: timestamp.toString(),
       formula,
       description,
-      timestamp: Date.now(),
+      timestamp,
     };
     const updated = [...savedFormulas, newFormula];
     setSavedFormulas(updated);
     localStorage.setItem('savedFormulas', JSON.stringify(updated));
-  };
+  }, [savedFormulas]);
 
   // Delete formula
-  const deleteFormula = (id: string) => {
+  const deleteFormula = useCallback((id: string) => {
     const updated = savedFormulas.filter(f => f.id !== id);
     setSavedFormulas(updated);
     localStorage.setItem('savedFormulas', JSON.stringify(updated));
-  };
+  }, [savedFormulas]);
 
   const handleSend = async () => {
     if (!input.trim() || !spreadsheetData) return;

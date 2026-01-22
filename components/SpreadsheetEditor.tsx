@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { SpreadsheetData } from '@/types/spreadsheet';
 import { DataGrid, Column, RenderCellProps } from 'react-data-grid';
-import { Download, Save, Undo, Redo, FileDown, Maximize2, Minimize2, Search, Replace } from 'lucide-react';
+import { Download, Save, Undo, Redo, FileDown, Maximize2, Minimize2, Search } from 'lucide-react';
 import { useSpreadsheet } from '@/hooks/useSpreadsheet';
 import 'react-data-grid/lib/styles.css';
 

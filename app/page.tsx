@@ -8,7 +8,7 @@ import AIAssistant from '@/components/AIAssistant';
 import TabBar from '@/components/TabBar';
 import { SpreadsheetData, OpenFile } from '@/types/spreadsheet';
 import { isAuthenticated, getCurrentUserId } from '@/lib/supabase/client';
-import { Sun, Moon, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Upload } from 'lucide-react';
+import { Sun, Moon, Upload } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -45,9 +45,16 @@ export default function Home() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-    setTheme(initialTheme as 'light' | 'dark');
-    document.documentElement.setAttribute('data-theme', initialTheme);
+    const initialTheme = (savedTheme as 'light' | 'dark') || (prefersDark ? 'dark' : 'light');
+    
+    // Use a function to avoid cascading renders
+    setTheme((currentTheme) => {
+      if (currentTheme !== initialTheme) {
+        document.documentElement.setAttribute('data-theme', initialTheme);
+        return initialTheme;
+      }
+      return currentTheme;
+    });
   }, []);
 
   // Toggle theme
@@ -142,7 +149,7 @@ export default function Home() {
   }, [activeFileId]);
 
   // Handle data changes
-  const handleDataChange = useCallback((data: any[][], isDirty: boolean) => {
+  const handleDataChange = useCallback((data: unknown[][], isDirty: boolean) => {
     if (!activeFileId) return;
     setOpenFiles(prev => 
       prev.map(f => 
