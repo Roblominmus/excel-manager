@@ -4,6 +4,18 @@ import { useState, useCallback } from 'react';
 import type { Sheet } from '@fortune-sheet/core';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+
+// Type definition for Fortune Sheet cell data
+interface FortuneCellData {
+  r: number;
+  c: number;
+  v: {
+    v: unknown;
+    m: string;
+    [key: string]: unknown;
+  } | unknown;
+}
 
 export function useCanvasSpreadsheet() {
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -181,7 +193,7 @@ export function useCanvasSpreadsheet() {
    * Convert Fortune Sheet data to simple array format
    */
   const convertToFortuneSheet = (name: string, rows: unknown[][]): Sheet => {
-    const celldata: unknown[] = [];
+    const celldata: FortuneCellData[] = [];
     rows.forEach((row, r) => {
       row.forEach((cell, c) => {
         if (cell !== undefined && cell !== null && cell !== '') {
@@ -265,19 +277,35 @@ export function useCanvasSpreadsheet() {
   }, [sheets]);
 
   /**
-   * Export to ODS format (LibreOffice)
-   * Note: Currently exports as XLSX which LibreOffice can open and save as ODS.
-   * For true ODS export, a dedicated ODS library would be needed.
+   * Export to ODS format (LibreOffice) using XLSX library
    */
   const exportToODS = useCallback(async (filename: string) => {
-    // ExcelJS doesn't support ODS export directly
-    // Export as XLSX which is compatible with LibreOffice
-    // Users can then save as ODS in LibreOffice if needed
-    await exportToExcel(filename);
-  }, [exportToExcel]);
+    if (sheets.length === 0) return;
+    
+    // Convert Fortune Sheet format to XLSX workbook
+    const wb = XLSX.utils.book_new();
+    
+    sheets.forEach((sheet) => {
+      const data: any[][] = [];
+      
+      if (sheet.celldata) {
+        sheet.celldata.forEach((cell: any) => {
+          if (!data[cell.r]) data[cell.r] = [];
+          const value = typeof cell.v === 'object' && cell.v !== null && 'v' in cell.v ? cell.v.v : cell.v;
+          data[cell.r][cell.c] = value ?? '';
+        });
+      }
+      
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, sheet.name || 'Sheet1');
+    });
+    
+    // Export as ODS
+    XLSX.writeFile(wb, `${filename}.ods`, { bookType: 'ods' });
+  }, [sheets]);
 
   /**
-   * Export to CSV
+   * Export to CSV with proper escaping to prevent CSV injection
    */
   const exportToCSV = useCallback((filename: string) => {
     if (sheets.length === 0) return;
@@ -289,7 +317,27 @@ export function useCanvasSpreadsheet() {
       sheet.celldata.forEach((cell: any) => {
         if (!rows[cell.r]) rows[cell.r] = [];
         const value = typeof cell.v === 'object' ? cell.v.v : cell.v;
-        rows[cell.r][cell.c] = String(value ?? '');
+        const stringValue = String(value ?? '');
+        
+        // Escape values to prevent CSV injection
+        // Wrap in quotes if contains comma, quote, newline, or starts with =, +, -, @, tab, or carriage return
+        let escaped = stringValue;
+        if (
+          stringValue.includes(',') || 
+          stringValue.includes('"') || 
+          stringValue.includes('\n') ||
+          /^[=+\-@\t\r]/.test(stringValue)
+        ) {
+          // Escape double quotes by doubling them
+          escaped = '"' + stringValue.replace(/"/g, '""') + '"';
+          
+          // Prepend single quote to prevent formula execution
+          if (/^[=+\-@]/.test(stringValue)) {
+            escaped = "'" + stringValue;
+          }
+        }
+        
+        rows[cell.r][cell.c] = escaped;
       });
     }
     

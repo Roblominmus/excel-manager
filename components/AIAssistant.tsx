@@ -49,12 +49,13 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
     const saved = localStorage.getItem('savedFormulas');
     if (saved) {
       try {
-        setSavedFormulas(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSavedFormulas(parsed);
       } catch (e) {
         console.error('Failed to load saved formulas:', e);
       }
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save formula to localStorage
   const saveFormula = useCallback((formula: string, description: string) => {
@@ -106,13 +107,17 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
       code: response.success ? response.code : undefined,
     };
 
-    // If it's a formula and we can evaluate it, calculate the result
+    // If it's a formula and we can evaluate it, try to calculate the result
     if (response.success && response.type === 'formula' && response.code && evaluateFormula) {
       try {
         const result = evaluateFormula(response.code);
-        assistantMessage.content += `\n\n**Result:** \`${result}\``;
-      } catch (error: any) {
+        // Only add result if it's different from the formula and not an error
+        if (result !== response.code && String(result) !== '#ERROR' && String(result) !== 'ERROR') {
+          assistantMessage.content += `\n\n**Computed Result:** \`${result}\``;
+        }
+      } catch (error) {
         console.error('Formula evaluation error:', error);
+        // Don't show error to user, just log it
       }
     }
 
@@ -278,7 +283,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
               {message.role === 'assistant' ? (
                 <ReactMarkdown
                   components={{
-                    code({ node, inline, className, children, ...props }: any) {
+                    code({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode; [key: string]: unknown }) {
                       const match = /language-(\w+)/.exec(className || '');
                       return !inline && match ? (
                         <SyntaxHighlighter 

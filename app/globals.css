@@ -184,6 +184,10 @@ input:focus-visible {
   --fortune-sheet-border: #3c3c3c;
 }
 
+[data-theme="dark"] .luckysheet {
+  background-color: #1e1e1e !important;
+}
+
 [data-theme="dark"] .luckysheet-cell-main {
   background-color: #2d2d2d !important;
 }
@@ -192,4 +196,38 @@ input:focus-visible {
 [data-theme="dark"] .luckysheet-rows-h-cells {
   background-color: #252526 !important;
   color: #d4d4d4 !important;
+}
+
+[data-theme="dark"] .luckysheet-cell-input {
+  background-color: #2d2d2d !important;
+  color: #d4d4d4 !important;
+}
+
+[data-theme="dark"] .luckysheet-toolbar {
+  background-color: #252526 !important;
+  border-bottom: 1px solid #3c3c3c !important;
+}
+
+[data-theme="dark"] .luckysheet-toolbar button {
+  color: #d4d4d4 !important;
+}
+
+[data-theme="dark"] .luckysheet-wa-editor {
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+}
+
+[data-theme="dark"] .luckysheet-wa-calculate,
+[data-theme="dark"] .luckysheet-wa-functionbox {
+  background-color: #252526 !important;
+  color: #d4d4d4 !important;
+  border: 1px solid #3c3c3c !important;
+}
+
+[data-theme="dark"] .luckysheet-formula-text-color {
+  color: #d4d4d4 !important;
+}
+
+[data-theme="dark"] .luckysheet-grid-container {
+  background-color: #1e1e1e !important;
 }

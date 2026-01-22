@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import FileManager from '@/components/FileManager';
 import SpreadsheetEditor from '@/components/SpreadsheetEditor';
@@ -8,7 +8,7 @@ import AIAssistant from '@/components/AIAssistant';
 import TabBar from '@/components/TabBar';
 import { SpreadsheetData, OpenFile } from '@/types/spreadsheet';
 import { isAuthenticated, getCurrentUserId } from '@/lib/supabase/client';
-import { Sun, Moon, Upload } from 'lucide-react';
+import { Sun, Moon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -18,7 +18,7 @@ export default function Home() {
   // Multi-file state
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [evaluateFormula, setEvaluateFormula] = useState<((formula: string) => any) | undefined>();
+  const [evaluateFormula, setEvaluateFormula] = useState<((formula: string) => unknown) | undefined>();
   
   // UI state
   const [leftWidth, setLeftWidth] = useState(320);
@@ -29,6 +29,8 @@ export default function Home() {
   const [isFullView, setIsFullView] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Clean the filename by removing timestamps and query strings
   const cleanFileName = useCallback((url: string, providedName?: string): string => {
@@ -47,15 +49,13 @@ export default function Home() {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const initialTheme = (savedTheme as 'light' | 'dark') || (prefersDark ? 'dark' : 'light');
     
-    // Use a function to avoid cascading renders
-    setTheme((currentTheme) => {
-      if (currentTheme !== initialTheme) {
-        document.documentElement.setAttribute('data-theme', initialTheme);
-        return initialTheme;
-      }
-      return currentTheme;
-    });
-  }, []);
+    // Update document attribute immediately
+    document.documentElement.setAttribute('data-theme', initialTheme);
+    // Set state after DOM update to avoid re-render issues
+    if (theme !== initialTheme) {
+      setTheme(initialTheme);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle theme
   const toggleTheme = useCallback(() => {
@@ -86,6 +86,11 @@ export default function Home() {
     return Math.min(Math.max(value, min), max);
   }, []);
 
+  // Stabilize handleMouseUp with useCallback
+  const handleMouseUp = useCallback(() => {
+    setDragging(null);
+  }, []);
+
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragging) return;
@@ -101,8 +106,6 @@ export default function Home() {
       }
     };
 
-    const handleMouseUp = () => setDragging(null);
-
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
@@ -110,7 +113,7 @@ export default function Home() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, clamp, rightWidth, leftWidth]);
+  }, [dragging, clamp, rightWidth, leftWidth, handleMouseUp]);
 
   // Handle file selection from FileManager
   const handleFileSelect = useCallback((url: string, name?: string) => {
@@ -148,9 +151,37 @@ export default function Home() {
     });
   }, [activeFileId]);
 
-  // Handle data changes
+  // Get active file
+  const activeFile = openFiles.find(f => f.id === activeFileId);
+
+  // Save function with toast notification
+  const handleSave = useCallback(async () => {
+    const currentFile = openFiles.find(f => f.id === activeFileId);
+    if (!currentFile) return;
+    
+    try {
+      // Note: Save functionality requires Supabase API integration
+      // to update files in storage. This is a placeholder for future implementation.
+      // await uploadFileToSupabase(currentFile.url, currentFile.data);
+      
+      setOpenFiles(prev => 
+        prev.map(f => 
+          f.id === activeFileId ? { ...f, isDirty: false } : f
+        )
+      );
+      setToast({ message: 'Changes saved successfully!', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (error) {
+      console.error('Save error:', error);
+      setToast({ message: 'Failed to save changes', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    }
+  }, [openFiles, activeFileId]);
+
+  // Handle data changes with auto-save
   const handleDataChange = useCallback((data: unknown[][], isDirty: boolean) => {
     if (!activeFileId) return;
+    
     setOpenFiles(prev => 
       prev.map(f => 
         f.id === activeFileId 
@@ -158,10 +189,22 @@ export default function Home() {
           : f
       )
     );
-  }, [activeFileId]);
+    
+    // Auto-save after 5 seconds of no changes
+    if (isDirty) {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        handleSave();
+      }, 5000);
+    }
+  }, [activeFileId, handleSave]);
 
-  // Get active file
-  const activeFile = openFiles.find(f => f.id === activeFileId);
+  // Memoize the evaluateFormula callback to prevent infinite loops
+  const handleEvaluateFormulaReady = useCallback((evaluateFunc: (formula: string) => unknown) => {
+    setEvaluateFormula(() => evaluateFunc);
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -318,12 +361,25 @@ export default function Home() {
           </>
         )}
 
+        {/* Left sidebar toggle when closed */}
+        {!leftSidebarOpen && !isFullView && (
+          <button
+            onClick={() => setLeftSidebarOpen(true)}
+            className="fixed left-2 top-1/2 -translate-y-1/2 z-50 p-2 border rounded-r shadow-md hover:bg-gray-50"
+            title="Open File Manager"
+            style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)' }}
+          >
+            <ChevronRight size={20} />
+          </button>
+        )}
+
         {/* Center: Spreadsheet Editor */}
         <div 
           className="flex-1 overflow-hidden" 
           style={{ 
             backgroundColor: 'var(--bg-primary)',
             border: '1px solid var(--border)',
+            minWidth: 0,  // Allow flex shrinking
           }}
         >
           <SpreadsheetEditor 
@@ -338,26 +394,25 @@ export default function Home() {
                 );
               }
             }}
-            onEvaluateFormulaReady={(evaluateFunc) => {
-              setEvaluateFormula(() => evaluateFunc);
-            }}
+            onEvaluateFormulaReady={handleEvaluateFormulaReady}
             onDataChange={handleDataChange}
-            onSave={() => {
-              // Note: Save functionality requires Supabase API integration
-              // to update files in storage. This is a placeholder for future implementation.
-              // await uploadFileToSupabase(activeFile.url, activeFile.data);
-              if (activeFileId) {
-                setOpenFiles(prev =>
-                  prev.map(f =>
-                    f.id === activeFileId ? { ...f, isDirty: false } : f
-                  )
-                );
-              }
-            }}
+            onSave={handleSave}
             onFullscreenToggle={() => setIsFullView(!isFullView)}
             isFullscreen={isFullView}
           />
         </div>
+
+        {/* Right sidebar toggle when closed */}
+        {!rightSidebarOpen && !isFullView && (
+          <button
+            onClick={() => setRightSidebarOpen(true)}
+            className="fixed right-2 top-1/2 -translate-y-1/2 z-50 p-2 border rounded-l shadow-md hover:bg-gray-50"
+            title="Open AI Assistant"
+            style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)' }}
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
 
         {/* Right Resizer */}
         {showRightSidebar && (
@@ -398,6 +453,15 @@ export default function Home() {
             <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>Drop files to import</p>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Excel and CSV files supported</p>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        } text-white`}>
+          {toast.message}
         </div>
       )}
     </div>
