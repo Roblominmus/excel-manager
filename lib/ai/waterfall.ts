@@ -19,10 +19,10 @@
  */
 
 import { AIRequest, AIResponse, SpreadsheetSchema } from '@/types/ai';
-import { makeGroqRequest } from '../services/providers/groq';
-import { makeDeepSeekRequest } from '../services/providers/deepseek';
-import { makeXAIRequest } from '../services/providers/xai';
-import { makeCohereRequest } from '../services/providers/cohere';
+import { makeGroqRequest } from '@/services/providers/groq';
+import { makeDeepSeekRequest } from '@/services/providers/deepseek';
+import { makeXAIRequest } from '@/services/providers/xai';
+import { makeCohereRequest } from '@/services/providers/cohere';
 
 /**
  * Provider configuration in priority order (fastest to most capable)

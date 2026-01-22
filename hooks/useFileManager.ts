@@ -18,11 +18,11 @@ import { supabase, getCurrentUserId } from '@/lib/supabase/client';
 import { Database } from '@/lib/supabase/database.types';
 
 type Folder = Database['public']['Tables']['folders']['Row'];
-type File = Database['public']['Tables']['files']['Row'];
+type FileRecord = Database['public']['Tables']['files']['Row'];
 
 export interface FolderNode extends Folder {
   children: FolderNode[];
-  files: File[];
+  files: FileRecord[];
 }
 
 export interface FileManagerState {
@@ -53,7 +53,7 @@ export function useFileManager() {
       }
 
       // Fetch all folders for the user
-      const { data: folders, error: folderError } = await supabase
+      const { data: foldersData, error: folderError } = await supabase
         .from('folders')
         .select('*')
         .eq('user_id', userId)
@@ -62,7 +62,7 @@ export function useFileManager() {
       if (folderError) throw folderError;
 
       // Fetch all files for the user
-      const { data: files, error: fileError } = await supabase
+      const { data: filesData, error: fileError } = await supabase
         .from('files')
         .select('*')
         .eq('user_id', userId)
@@ -70,12 +70,15 @@ export function useFileManager() {
 
       if (fileError) throw fileError;
 
+      const folders = (foldersData as any[]) || [];
+      const files = (filesData as any[]) || [];
+
       // Build folder hierarchy
       const folderMap = new Map<string, FolderNode>();
       const rootFolders: FolderNode[] = [];
 
       // Initialize all folders
-      (folders || []).forEach((folder) => {
+      folders.forEach((folder) => {
         folderMap.set(folder.id, {
           ...folder,
           children: [],
@@ -84,7 +87,7 @@ export function useFileManager() {
       });
 
       // Build parent-child relationships
-      (folders || []).forEach((folder) => {
+      folders.forEach((folder) => {
         const node = folderMap.get(folder.id)!;
         if (folder.parent_id) {
           const parent = folderMap.get(folder.parent_id);
@@ -97,7 +100,7 @@ export function useFileManager() {
       });
 
       // Attach files to their folders
-      (files || []).forEach((file) => {
+      files.forEach((file) => {
         if (file.folder_id) {
           const folder = folderMap.get(file.folder_id);
           if (folder) {
@@ -131,13 +134,15 @@ export function useFileManager() {
         const userId = await getCurrentUserId();
         if (!userId) throw new Error('User not authenticated');
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('folders')
-          .insert({
-            name,
-            parent_id: parentId,
-            user_id: userId,
-          })
+          .insert([
+            {
+              name,
+              parent_id: parentId,
+              user_id: userId,
+            },
+          ])
           .select()
           .single();
 
@@ -160,7 +165,7 @@ export function useFileManager() {
   const renameFolder = useCallback(
     async (folderId: string, newName: string) => {
       try {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('folders')
           .update({ name: newName })
           .eq('id', folderId);
@@ -184,7 +189,7 @@ export function useFileManager() {
       try {
         // Note: Cascade delete should be handled by database triggers
         // or you need to manually delete all child folders and files
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('folders')
           .delete()
           .eq('id', folderId);
@@ -214,7 +219,7 @@ export function useFileManager() {
         const storagePath = `${userId}/${timestamp}_${file.name}`;
 
         // Upload to storage bucket
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await (supabase.storage as any)
           .from('spreadsheets')
           .upload(storagePath, file, {
             cacheControl: '3600',
@@ -224,16 +229,18 @@ export function useFileManager() {
         if (uploadError) throw uploadError;
 
         // Create database record
-        const { data: fileRecord, error: dbError } = await supabase
+        const { data: fileRecord, error: dbError } = await (supabase as any)
           .from('files')
-          .insert({
-            name: file.name,
-            folder_id: folderId,
-            storage_path: storagePath,
-            user_id: userId,
-            size: file.size,
-            mime_type: file.type,
-          })
+          .insert([
+            {
+              name: file.name,
+              folder_id: folderId,
+              storage_path: storagePath,
+              user_id: userId,
+              size: file.size,
+              mime_type: file.type,
+            },
+          ])
           .select()
           .single();
 
@@ -253,7 +260,7 @@ export function useFileManager() {
   /**
    * Download a file from storage
    */
-  const downloadFile = useCallback(async (fileRecord: File) => {
+  const downloadFile = useCallback(async (fileRecord: FileRecord) => {
     try {
       const { data, error } = await supabase.storage
         .from('spreadsheets')
@@ -292,7 +299,7 @@ export function useFileManager() {
         }
 
         // Delete from database
-        const { error: dbError } = await supabase
+        const { error: dbError } = await (supabase as any)
           .from('files')
           .delete()
           .eq('id', fileId);
@@ -314,7 +321,7 @@ export function useFileManager() {
   const moveFile = useCallback(
     async (fileId: string, newFolderId: string | null) => {
       try {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('files')
           .update({ folder_id: newFolderId })
           .eq('id', fileId);
@@ -339,7 +346,7 @@ export function useFileManager() {
         const userId = await getCurrentUserId();
         if (!userId) throw new Error('User not authenticated');
 
-        let query = supabase
+        let query = (supabase as any)
           .from('files')
           .select('*')
           .eq('user_id', userId);
