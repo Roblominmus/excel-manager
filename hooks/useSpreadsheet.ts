@@ -64,7 +64,15 @@ export function useSpreadsheet(fileUrl?: string) {
 
       // Load data into HyperFormula
       if (hfRef.current) {
-        hfRef.current.setSheetContent(0, [headers, ...rows]);
+        try {
+          // Add sheet if it doesn't exist
+          if (hfRef.current.getSheetNames().length === 0) {
+            hfRef.current.addSheet('Sheet1');
+          }
+          hfRef.current.setSheetContent(0, [headers, ...rows]);
+        } catch (e) {
+          console.warn('HyperFormula error:', e);
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load spreadsheet');
@@ -83,7 +91,15 @@ export function useSpreadsheet(fileUrl?: string) {
 
     // Update HyperFormula
     if (hfRef.current && newData) {
-      hfRef.current.setSheetContent(0, [newData.headers, ...newData.rows]);
+      try {
+        // Add sheet if it doesn't exist
+        if (hfRef.current.getSheetNames().length === 0) {
+          hfRef.current.addSheet('Sheet1');
+        }
+        hfRef.current.setSheetContent(0, [newData.headers, ...newData.rows]);
+      } catch (e) {
+        console.warn('HyperFormula error:', e);
+      }
     }
   }, []);
 

@@ -163,7 +163,9 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     if (node.type === 'file' && node.storage_path && onFileSelect) {
       const url = await getFileUrl(node.storage_path);
       if (url) {
-        onFileSelect(url, node.name);
+        // Clean filename: remove query params
+        const cleanName = node.name.split('?')[0];
+        onFileSelect(url, cleanName);
       }
     }
   };

@@ -92,6 +92,15 @@ export default function Home() {
     };
   }, [dragging, clamp, rightWidth, leftWidth]);
 
+  // Helper function to get clean filename without URL params
+  const getCleanFileName = useCallback((url: string, providedName?: string): string => {
+    if (providedName && !providedName.includes('?')) return providedName;
+    let name = url.split('/').pop() || 'Untitled';
+    name = name.split('?')[0]; // Remove query params
+    name = name.replace(/^\d+_/, ''); // Remove timestamp prefix like "1769076886305_"
+    return name;
+  }, []);
+
   // Handle file selection from FileManager
   const handleFileSelect = useCallback((url: string, name?: string) => {
     // Check if file is already open
@@ -101,10 +110,17 @@ export default function Home() {
       return;
     }
 
+    // Generate unique ID using URL hash + random string
+    const urlHash = url.split('').reduce((acc, char) => {
+      return ((acc << 5) - acc) + char.charCodeAt(0);
+    }, 0).toString(36);
+    const randomPart = crypto.randomUUID().substring(0, 8);
+    const uniqueId = `${urlHash}_${randomPart}`;
+
     // Create new file entry
     const newFile: OpenFile = {
-      id: Date.now().toString(),
-      name: name || url.split('/').pop() || 'Untitled',
+      id: uniqueId,
+      name: getCleanFileName(url, name),
       url,
       data: null,
       isDirty: false,
@@ -112,7 +128,7 @@ export default function Home() {
 
     setOpenFiles(prev => [...prev, newFile]);
     setActiveFileId(newFile.id);
-  }, [openFiles]);
+  }, [openFiles, getCleanFileName]);
 
   // Handle tab close
   const handleTabClose = useCallback((fileId: string) => {
@@ -268,9 +284,9 @@ export default function Home() {
               }}
             >
               <FileManager 
-                onFileSelect={(url: string) => {
-                  const fileName = url.split('/').pop() || 'Untitled';
-                  handleFileSelect(url, fileName);
+                onFileSelect={(url: string, fileName?: string) => {
+                  const cleanName = getCleanFileName(url, fileName);
+                  handleFileSelect(url, cleanName);
                 }}
               />
             </div>
