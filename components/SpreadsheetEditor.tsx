@@ -46,6 +46,9 @@ export default function SpreadsheetEditor({
   const hasProvidedEvaluator = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Fortune Sheet selector variants for finding the grid container
+  const FORTUNE_SHEET_SELECTORS = '.luckysheet-grid-container, [class*="fortune-sheet"], .luckysheet';
+
   // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
   const getColumnLetter = useCallback((index: number): string => {
     let letter = '';
@@ -140,7 +143,7 @@ export default function SpreadsheetEditor({
 
     const handleWheel = (e: WheelEvent) => {
       // Find the spreadsheet container
-      const spreadsheetContainer = container.querySelector('.luckysheet-grid-container, [class*="fortune-sheet"], .luckysheet');
+      const spreadsheetContainer = container.querySelector(FORTUNE_SHEET_SELECTORS);
       if (!spreadsheetContainer) return;
 
       // Allow default scrolling behavior - the spreadsheet should handle this

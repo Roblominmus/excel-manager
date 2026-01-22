@@ -178,7 +178,13 @@ export default function Home() {
         throw new Error('File record not found in database');
       }
 
-      const fileRecord = fileRecords[0] as { id: string; storage_path: string; [key: string]: unknown };
+      const fileRecord = fileRecords[0] as { 
+        id: string; 
+        storage_path: string; 
+        name: string;
+        user_id: string;
+        folder_id: string | null;
+      };
 
       // Convert the spreadsheet data to a file format
       // This requires getting the sheet data from SpreadsheetEditor
@@ -222,12 +228,19 @@ export default function Home() {
       if (uploadError) throw uploadError;
 
       // Update file metadata in database (update timestamp)
+      interface FileUpdateData {
+        updated_at: string;
+        size: number;
+      }
+      
+      const updateData: FileUpdateData = {
+        updated_at: new Date().toISOString(),
+        size: blob.size,
+      };
+      
       const { error: updateError } = await (supabase
         .from('files')
-        .update({ 
-          updated_at: new Date().toISOString(),
-          size: blob.size,
-        } as never)
+        .update(updateData as never)
         .eq('id', fileRecord.id));
 
       if (updateError) throw updateError;
