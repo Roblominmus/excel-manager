@@ -25,3 +25,17 @@ export interface SpreadsheetData {
     columnCount: number;
   };
 }
+
+export interface OpenFile {
+  id: string;
+  name: string;
+  url: string;
+  data: SpreadsheetData | null;
+  isDirty: boolean;
+}
+
+export interface UndoRedoState {
+  past: SpreadsheetData[];
+  present: SpreadsheetData | null;
+  future: SpreadsheetData[];
+}
