@@ -18,6 +18,7 @@ export default function Home() {
   // Multi-file state
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [evaluateFormula, setEvaluateFormula] = useState<((formula: string) => any) | undefined>();
   
   // UI state
   const [leftWidth, setLeftWidth] = useState(320);
@@ -315,6 +316,9 @@ export default function Home() {
                 );
               }
             }}
+            onEvaluateFormulaReady={(evaluateFunc) => {
+              setEvaluateFormula(() => evaluateFunc);
+            }}
             onDataChange={handleDataChange}
             onSave={() => {
               // Note: Save functionality requires Supabase API integration
@@ -351,6 +355,7 @@ export default function Home() {
             >
               <AIAssistant 
                 spreadsheetData={activeFile?.data || undefined}
+                evaluateFormula={evaluateFormula}
                 onApplyCode={(code, type) => {
                   console.log('Apply code:', type, code);
                 }}

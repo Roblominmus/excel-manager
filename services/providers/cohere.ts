@@ -45,7 +45,8 @@ Generate the appropriate formula or transformation code.`;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'command-r',
+        // Updated to a supported Cohere model
+        model: 'command-r-plus',
         message: userPrompt,
         preamble: systemPrompt,
         temperature: 0.3,

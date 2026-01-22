@@ -12,6 +12,7 @@ interface SpreadsheetEditorProps {
   fileName?: string;
   onDataLoaded?: (data: SpreadsheetData) => void;
   onDataChange?: (data: any[][], isDirty: boolean) => void;
+  onEvaluateFormulaReady?: (evaluateFormula: (formula: string) => any) => void;
   onSave?: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function SpreadsheetEditor({
   fileName,
   onDataLoaded, 
   onDataChange,
+  onEvaluateFormulaReady,
   onSave,
 }: SpreadsheetEditorProps) {
   const { 
@@ -52,6 +54,13 @@ export default function SpreadsheetEditor({
       onDataLoaded(data);
     }
   }, [data]); // onDataLoaded intentionally excluded
+
+  // Pass evaluateFormula to parent when available
+  useEffect(() => {
+    if (onEvaluateFormulaReady && evaluateFormula) {
+      onEvaluateFormulaReady(evaluateFormula);
+    }
+  }, [evaluateFormula, onEvaluateFormulaReady]);
 
   // Convert data to DataGrid format
   const rows = useMemo(() => {

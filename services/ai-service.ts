@@ -5,26 +5,20 @@
  * It tries providers in sequence: DeepSeek → Cohere → Groq → X.AI
  * If one fails (rate limit, error, timeout), it automatically retries with the next.
  * 
- * SECURITY: This service NEVER receives actual spreadsheet row data.
- * It only receives column headers/schema and user queries.
+ * The AI now has access to full spreadsheet data to generate accurate formulas
+ * and provide computed results for calculations.
  */
 
 import { AIRequest, AIResponse, SpreadsheetSchema } from '@/types/ai';
-import { makeDeepSeekRequest } from './providers/deepseek';
-import { makeCohereRequest } from './providers/cohere';
 import { makeGroqRequest } from './providers/groq';
-import { makeXAIRequest } from './providers/xai';
 import { makeOpenAIRequest } from './providers/openai';
 
 /**
  * Provider configuration in priority order
  */
+// Simplify to the provider that works out of the box. Add others back once keys/credits exist.
 const PROVIDERS = [
-  { name: 'OpenAI', handler: makeOpenAIRequest },
   { name: 'Groq', handler: makeGroqRequest },
-  { name: 'DeepSeek', handler: makeDeepSeekRequest },
-  { name: 'X.AI', handler: makeXAIRequest },
-  { name: 'Cohere', handler: makeCohereRequest },
 ];
 
 /**

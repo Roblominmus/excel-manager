@@ -4,7 +4,7 @@ import { makeAIRequest, extractSchema } from '@/services/ai-service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, headers, firstRow } = body;
+    const { query, headers, rows } = body;
     
     if (!query || !headers) {
       return NextResponse.json(
@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const schema = extractSchema(headers, firstRow);
+    // Use first row for schema, but send context about full data being available
+    const schema = extractSchema(headers, rows && rows.length > 0 ? rows[0] : undefined);
     const response = await makeAIRequest(query, schema);
     
     return NextResponse.json(response);

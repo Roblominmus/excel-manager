@@ -20,22 +20,25 @@ export async function makeGroqRequest(
   }
 
   const systemPrompt = `You are an Excel formula and data transformation expert. 
-You will receive a spreadsheet schema (column headers and types) and a user's natural language request.
-Your job is to output ONLY valid Excel formulas or JavaScript transformation code.
+You will receive a spreadsheet schema (column headers and types), the actual spreadsheet data, and a user's natural language request.
+Your job is to output ONLY valid Excel formulas that can operate on the provided data.
 
-CRITICAL SECURITY RULE: You will NEVER see actual row data. Only the schema.
+You can access the full spreadsheet data to understand context and generate accurate formulas.
+For example, if asked to sum a column, generate: =SUM(A:A) 
+For average: =AVERAGE(B:B)
+For counting with conditions: =COUNTIF(A:A,">=100")
 
 Return a JSON response with:
 {
-  "type": "formula" or "transformation",
-  "code": "the formula or JavaScript code",
-  "explanation": "brief explanation"
+  "type": "formula",
+  "code": "the Excel formula",
+  "explanation": "brief explanation of what the formula does"
 }`;
 
   const userPrompt = `Schema: ${JSON.stringify(schema)}
 User Request: ${query}
 
-Generate the appropriate formula or transformation code.`;
+Generate the appropriate Excel formula to answer this request.`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -45,7 +48,7 @@ Generate the appropriate formula or transformation code.`;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'mixtral-8x7b-32768',
+        model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

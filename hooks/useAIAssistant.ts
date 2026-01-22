@@ -7,15 +7,15 @@ export function useAIAssistant() {
   const [loading, setLoading] = useState(false);
   const [lastResponse, setLastResponse] = useState<AIResponse | null>(null);
 
-  const askAI = async (query: string, headers: string[], firstRow?: unknown[]) => {
+  const askAI = async (query: string, headers: string[], rows: unknown[][]) => {
     setLoading(true);
 
     try {
-      // Call the API route instead of the service directly
+      // Call the API route with full data
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, headers, firstRow }),
+        body: JSON.stringify({ query, headers, rows }),
       });
 
       if (!response.ok) {

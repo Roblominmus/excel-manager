@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Trash2 } from 'lucide-react';
 import { useAIAssistant } from '@/hooks/useAIAssistant';
 import { SpreadsheetData } from '@/types/spreadsheet';
 
@@ -14,10 +14,11 @@ interface Message {
 
 interface AIAssistantProps {
   spreadsheetData?: SpreadsheetData;
+  evaluateFormula?: (formula: string) => any;
   onApplyCode?: (code: string, type: 'formula' | 'transformation') => void;
 }
 
-export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistantProps) {
+export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyCode }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -39,21 +40,32 @@ export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistan
     setMessages(prev => [...prev, userMessage]);
     setInput('');
 
-    // Ask AI with only headers and first row types
+    // Ask AI with full data so it can analyze and calculate
     const response = await askAI(
       input,
       spreadsheetData.headers,
-      spreadsheetData.rows[0]
+      spreadsheetData.rows
     );
 
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
       content: response.success
-        ? `${response.explanation}\n\n\`\`\`${response.type === 'formula' ? 'excel' : 'javascript'}\n${response.code}\n\`\`\``
+        ? `${response.explanation}\n\n\`\`\`excel\n${response.code}\n\`\`\``
         : `Error: ${response.error}`,
       provider: response.provider,
     };
+
+    // If it's a formula and we can evaluate it, calculate the result
+    if (response.success && response.type === 'formula' && response.code && evaluateFormula) {
+      try {
+        const result = evaluateFormula(response.code);
+        assistantMessage.content += `\n\n**Result:** \`${result}\``;
+      } catch (error: any) {
+        console.error('Formula evaluation error:', error);
+      }
+    }
+
     setMessages(prev => [...prev, assistantMessage]);
 
     // Optionally auto-apply the code
@@ -63,17 +75,46 @@ export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistan
     }
   };
 
+  const handleClearChat = () => {
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: 'Hello! I can help you with Excel formulas and data analysis. I can see your spreadsheet data and generate formulas to answer your questions. For example, try asking me to "sum all values in column A" or "calculate the average in column B".',
+      },
+    ]);
+  };
+
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
         <div className="flex items-center gap-2">
           <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
-          <h3 className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>AI Assistant</h3>
+          <div className="flex flex-col">
+            <h3 className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>AI Assistant</h3>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Can generate formulas and calculate results
+            </p>
+          </div>
         </div>
-        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-          Privacy: Only sees column headers
-        </p>
+        <button
+          onClick={handleClearChat}
+          title="Clear chat history"
+          className="p-2 rounded transition-colors"
+          style={{
+            color: 'var(--text-secondary)',
+            backgroundColor: 'var(--gray-100)',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--gray-200)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--gray-100)';
+          }}
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
 
       {/* Messages */}
