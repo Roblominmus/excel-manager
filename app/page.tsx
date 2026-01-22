@@ -8,7 +8,7 @@ import AIAssistant from '@/components/AIAssistant';
 import TabBar from '@/components/TabBar';
 import { SpreadsheetData, OpenFile } from '@/types/spreadsheet';
 import { isAuthenticated, getCurrentUserId } from '@/lib/supabase/client';
-import { Sun, Moon, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Sun, Moon, Upload } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -28,6 +28,7 @@ export default function Home() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [isFullView, setIsFullView] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // Clean the filename by removing timestamps and query strings
   const cleanFileName = useCallback((url: string, providedName?: string): string => {
@@ -44,9 +45,16 @@ export default function Home() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-    setTheme(initialTheme as 'light' | 'dark');
-    document.documentElement.setAttribute('data-theme', initialTheme);
+    const initialTheme = (savedTheme as 'light' | 'dark') || (prefersDark ? 'dark' : 'light');
+    
+    // Use a function to avoid cascading renders
+    setTheme((currentTheme) => {
+      if (currentTheme !== initialTheme) {
+        document.documentElement.setAttribute('data-theme', initialTheme);
+        return initialTheme;
+      }
+      return currentTheme;
+    });
   }, []);
 
   // Toggle theme
@@ -141,7 +149,7 @@ export default function Home() {
   }, [activeFileId]);
 
   // Handle data changes
-  const handleDataChange = useCallback((data: any[][], isDirty: boolean) => {
+  const handleDataChange = useCallback((data: unknown[][], isDirty: boolean) => {
     if (!activeFileId) return;
     setOpenFiles(prev => 
       prev.map(f => 
@@ -166,6 +174,45 @@ export default function Home() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullView]);
+
+  // Drag and drop file upload handler
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer?.types.includes('Files')) {
+        setIsDraggingFile(true);
+      }
+    };
+    
+    const handleDragLeave = (e: DragEvent) => {
+      if (e.relatedTarget === null) {
+        setIsDraggingFile(false);
+      }
+    };
+    
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      setIsDraggingFile(false);
+      
+      const files = Array.from(e.dataTransfer?.files || []);
+      if (files.length > 0) {
+        // Auto-open files after upload by selecting the first one
+        console.log('Files dropped:', files.map(f => f.name));
+        // Note: This requires integration with FileManager upload
+        // For now, just log the files
+      }
+    };
+    
+    document.addEventListener('dragover', handleDragOver);
+    document.addEventListener('dragleave', handleDragLeave);
+    document.addEventListener('drop', handleDrop);
+    
+    return () => {
+      document.removeEventListener('dragover', handleDragOver);
+      document.removeEventListener('dragleave', handleDragLeave);
+      document.removeEventListener('drop', handleDrop);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -206,32 +253,6 @@ export default function Home() {
             <h1 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Excel Manager</h1>
           </div>
           <div className="flex items-center gap-2">
-            {/* Sidebar toggles */}
-            <button
-              onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-              className="p-2 hover:bg-gray-200 transition-colors"
-              title={leftSidebarOpen ? 'Hide File Manager' : 'Show File Manager'}
-              style={{ border: '1px solid var(--border)' }}
-            >
-              {leftSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-            </button>
-            <button
-              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-              className="p-2 hover:bg-gray-200 transition-colors"
-              title={rightSidebarOpen ? 'Hide AI Assistant' : 'Show AI Assistant'}
-              style={{ border: '1px solid var(--border)' }}
-            >
-              {rightSidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-            </button>
-            {/* Full view toggle */}
-            <button
-              onClick={() => setIsFullView(!isFullView)}
-              className="p-2 hover:bg-gray-200 transition-colors"
-              title={isFullView ? 'Exit Full View' : 'Full View'}
-              style={{ border: '1px solid var(--border)' }}
-            >
-              {isFullView ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </button>
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -284,6 +305,7 @@ export default function Home() {
                   const fileName = url.split('/').pop() || 'Untitled';
                   handleFileSelect(url, fileName);
                 }}
+                onClose={() => setLeftSidebarOpen(false)}
               />
             </div>
 
@@ -332,6 +354,8 @@ export default function Home() {
                 );
               }
             }}
+            onFullscreenToggle={() => setIsFullView(!isFullView)}
+            isFullscreen={isFullView}
           />
         </div>
 
@@ -359,11 +383,23 @@ export default function Home() {
                 onApplyCode={(code, type) => {
                   console.log('Apply code:', type, code);
                 }}
+                onClose={() => setRightSidebarOpen(false)}
               />
             </div>
           </>
         )}
       </div>
+
+      {/* Drop Overlay for File Upload */}
+      {isDraggingFile && (
+        <div className="fixed inset-0 bg-blue-500/20 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-white p-8 rounded-lg shadow-xl text-center" style={{ border: '2px dashed var(--primary)' }}>
+            <Upload size={48} className="mx-auto mb-4 text-blue-500" />
+            <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>Drop files to import</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Excel and CSV files supported</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { SpreadsheetData } from '@/types/spreadsheet';
 import { DataGrid, Column, RenderCellProps } from 'react-data-grid';
-import { Download, Save, Undo, Redo, FileDown } from 'lucide-react';
+import { Download, Save, Undo, Redo, FileDown, Maximize2, Minimize2, Search } from 'lucide-react';
 import { useSpreadsheet } from '@/hooks/useSpreadsheet';
 import 'react-data-grid/lib/styles.css';
 
@@ -14,6 +14,8 @@ interface SpreadsheetEditorProps {
   onDataChange?: (data: any[][], isDirty: boolean) => void;
   onEvaluateFormulaReady?: (evaluateFormula: (formula: string) => any) => void;
   onSave?: () => void;
+  onFullscreenToggle?: () => void;
+  isFullscreen?: boolean;
 }
 
 export default function SpreadsheetEditor({ 
@@ -23,6 +25,8 @@ export default function SpreadsheetEditor({
   onDataChange,
   onEvaluateFormulaReady,
   onSave,
+  onFullscreenToggle,
+  isFullscreen = false,
 }: SpreadsheetEditorProps) {
   const { 
     data, 
@@ -39,8 +43,12 @@ export default function SpreadsheetEditor({
   } = useSpreadsheet(fileUrl);
   
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<{idx: number, rowIdx: number} | null>(null);
   const [formulaBarValue, setFormulaBarValue] = useState('');
   const [isDirty, setIsDirty] = useState(false);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
   const gridRef = useRef<any>(null);
   const prevDataRef = useRef<SpreadsheetData | null>(null);
   
@@ -61,6 +69,39 @@ export default function SpreadsheetEditor({
       onEvaluateFormulaReady(evaluateFormula);
     }
   }, [evaluateFormula, onEvaluateFormulaReady]);
+
+  // Track cell selection
+  const handleCellClick = useCallback((args: { column: any; row: any; rowIdx: number }) => {
+    if (!data) return;
+    
+    // Skip if clicking on row number column
+    if (args.column.key === '__row_number__') return;
+    
+    // Find column index from column key
+    const colIdx = data.headers.indexOf(args.column.key);
+    if (colIdx === -1) return;
+    
+    setSelectedPosition({ idx: colIdx, rowIdx: args.rowIdx });
+    const rawValue = data.rows[args.rowIdx]?.[colIdx] ?? '';
+    setFormulaBarValue(String(rawValue));
+    setSelectedCell({ row: args.rowIdx, col: colIdx });
+  }, [data]);
+
+  // Apply formula bar value to cell on Enter
+  const handleFormulaBarKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && selectedCell && data) {
+      const newRows = [...data.rows];
+      if (!newRows[selectedCell.row]) {
+        newRows[selectedCell.row] = [];
+      }
+      newRows[selectedCell.row][selectedCell.col] = formulaBarValue;
+      updateData({ ...data, rows: newRows });
+      setIsDirty(true);
+      if (onDataChange) {
+        onDataChange(newRows, true);
+      }
+    }
+  };
 
   // Convert data to DataGrid format
   const rows = useMemo(() => {
@@ -84,15 +125,52 @@ export default function SpreadsheetEditor({
     }) ?? [];
   }, [data, evaluateFormula]);
 
+  // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
+  const getColumnLetter = (index: number): string => {
+    let letter = '';
+    let num = index + 1; // Convert 0-based to 1-based
+    while (num > 0) {
+      const remainder = (num - 1) % 26;
+      letter = String.fromCharCode(65 + remainder) + letter;
+      num = Math.floor((num - 1) / 26);
+    }
+    return letter;
+  };
+
   const columns: Column<any>[] = useMemo(() => {
-    return data?.headers.map((header, idx) => ({
-      key: header,
-      name: header,
-      resizable: true,
-      editable: true,
-      width: 120,
-      editor: undefined, // Use default text editor explicitly
-    })) ?? [];
+    const cols: Column<any>[] = [];
+    
+    // Add row number column
+    cols.push({
+      key: '__row_number__',
+      name: '',
+      width: 50,
+      frozen: true,
+      resizable: false,
+      renderCell: (props: RenderCellProps<any>) => (
+        <div style={{ 
+          textAlign: 'center', 
+          color: 'var(--text-secondary)',
+          fontWeight: 600,
+          backgroundColor: 'var(--gray-100)',
+        }}>
+          {props.rowIdx + 1}
+        </div>
+      ),
+    });
+
+    // Add data columns with column letters
+    data?.headers.forEach((header, idx) => {
+      cols.push({
+        key: header,
+        name: `${getColumnLetter(idx)} - ${header}`,
+        resizable: true,
+        editable: true,
+        width: 120,
+      });
+    });
+    
+    return cols;
   }, [data]);
 
   const handleRowsChange = useCallback((newRows: any[]) => {
@@ -142,11 +220,20 @@ export default function SpreadsheetEditor({
           setIsDirty(false);
         }
       }
+      // Ctrl+F for find
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        setShowFindReplace(true);
+      }
+      // Escape to close find/replace
+      if (e.key === 'Escape' && showFindReplace) {
+        setShowFindReplace(false);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canUndo, canRedo, undo, redo, onSave]);
+  }, [canUndo, canRedo, undo, redo, onSave, showFindReplace]);
 
   if (loading) {
     return (
@@ -226,6 +313,18 @@ export default function SpreadsheetEditor({
           >
             <Redo size={14} />
           </button>
+          <button
+            onClick={() => setShowFindReplace(!showFindReplace)}
+            className="px-2 py-1.5 text-sm flex items-center gap-1.5 transition-colors"
+            style={{ 
+              backgroundColor: showFindReplace ? 'rgba(0, 102, 204, 0.1)' : 'var(--bg-primary)', 
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
+            title="Find & Replace (Ctrl+F)"
+          >
+            <Search size={14} />
+          </button>
           {onSave && (
             <button
               onClick={() => {
@@ -270,18 +369,33 @@ export default function SpreadsheetEditor({
             <FileDown size={14} />
             CSV
           </button>
+          {onFullscreenToggle && (
+            <button
+              onClick={onFullscreenToggle}
+              className="px-2 py-1.5 text-sm flex items-center gap-1.5 transition-colors"
+              style={{ 
+                backgroundColor: 'var(--bg-primary)', 
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+              }}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Formula Bar */}
       <div className="px-4 py-2 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)' }}>
         <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)', minWidth: '60px' }}>
-          {selectedCell ? `${String.fromCharCode(65 + selectedCell.col)}${selectedCell.row + 1}` : ''}
+          {selectedCell ? `${getColumnLetter(selectedCell.col)}${selectedCell.row + 1}` : ''}
         </span>
         <input
           type="text"
           value={formulaBarValue}
           onChange={(e) => setFormulaBarValue(e.target.value)}
+          onKeyDown={handleFormulaBarKeyDown}
           placeholder="Enter formula or value"
           className="flex-1 px-2 py-1 text-sm"
           style={{ 
@@ -292,6 +406,72 @@ export default function SpreadsheetEditor({
         />
       </div>
 
+      {/* Find & Replace Panel */}
+      {showFindReplace && (
+        <div className="px-4 py-2 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
+          <input
+            type="text"
+            value={findText}
+            onChange={(e) => setFindText(e.target.value)}
+            placeholder="Find..."
+            className="px-2 py-1 text-sm"
+            style={{ 
+              backgroundColor: 'var(--bg-primary)', 
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              width: '150px',
+            }}
+          />
+          <input
+            type="text"
+            value={replaceText}
+            onChange={(e) => setReplaceText(e.target.value)}
+            placeholder="Replace with..."
+            className="px-2 py-1 text-sm"
+            style={{ 
+              backgroundColor: 'var(--bg-primary)', 
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              width: '150px',
+            }}
+          />
+          <button
+            onClick={() => {
+              if (!findText || !data) return;
+              // Escape special regex characters to prevent ReDoS
+              const escapedFind = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const newRows = data.rows.map(row => 
+                row.map(cell => 
+                  typeof cell === 'string' && cell.includes(findText) 
+                    ? cell.split(findText).join(replaceText)
+                    : cell
+                )
+              );
+              updateData({ ...data, rows: newRows });
+              setIsDirty(true);
+              if (onDataChange) onDataChange(newRows, true);
+            }}
+            className="px-3 py-1 text-sm"
+            style={{ 
+              backgroundColor: 'var(--primary)', 
+              color: 'white',
+              border: '1px solid var(--primary)',
+            }}
+          >
+            Replace All
+          </button>
+          <button
+            onClick={() => setShowFindReplace(false)}
+            className="px-2 py-1 text-sm"
+            style={{ 
+              color: 'var(--text-secondary)',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Spreadsheet Grid - Full Height */}
       <div className="flex-1 min-h-0">
         <DataGrid
@@ -299,11 +479,50 @@ export default function SpreadsheetEditor({
           columns={columns}
           rows={rows}
           onRowsChange={handleRowsChange}
+          onCellClick={handleCellClick}
           className="rdg-light"
           style={{ height: '100%' }}
           rowHeight={28}
           headerRowHeight={32}
         />
+      </div>
+
+      {/* Status Bar */}
+      <div className="px-4 py-1.5 flex items-center justify-between text-xs" style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
+        <div className="flex items-center gap-4">
+          {selectedCell && data && (() => {
+            // Calculate statistics for selected cell or range
+            const cellValue = data.rows[selectedCell.row]?.[selectedCell.col];
+            const numValue = typeof cellValue === 'number' ? cellValue : parseFloat(String(cellValue));
+            
+            if (!isNaN(numValue)) {
+              return (
+                <>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    <strong>Value:</strong> {numValue.toLocaleString()}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    <strong>SUM:</strong> {numValue.toLocaleString()}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    <strong>COUNT:</strong> 1
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    <strong>AVG:</strong> {numValue.toLocaleString()}
+                  </span>
+                </>
+              );
+            }
+            return (
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Cell: {getColumnLetter(selectedCell.col)}{selectedCell.row + 1}
+              </span>
+            );
+          })()}
+        </div>
+        <div style={{ color: 'var(--text-secondary)' }}>
+          Ready
+        </div>
       </div>
     </div>
   );
