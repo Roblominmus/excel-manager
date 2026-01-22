@@ -11,6 +11,7 @@ interface FileManagerProps {
   userId?: string;
   currentFolderId?: string;
   onFileSelect?: (url: string, name?: string) => void;
+  onClose?: () => void;
 }
 
 interface TreeNode {
@@ -25,7 +26,7 @@ interface TreeNode {
   expanded?: boolean;
 }
 
-export default function FileManager({ userId: providedUserId, currentFolderId, onFileSelect }: FileManagerProps) {
+export default function FileManager({ userId: providedUserId, currentFolderId, onFileSelect, onClose }: FileManagerProps) {
   const { uploads, isUploading, uploadMultipleFiles } = useFileUpload(providedUserId || '', currentFolderId);
   const {
     folders,
@@ -564,6 +565,15 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
             />
             <FolderUp size={16} style={{ color: 'var(--text-secondary)' }} />
           </label>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-200 transition-colors"
+              title="Close File Manager"
+            >
+              <ChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
+            </button>
+          )}
         </div>
       </div>
 
