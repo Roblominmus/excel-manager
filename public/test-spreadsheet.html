@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Fortune Sheet</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortune-sheet/react@0.2.0/dist/index.css">
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #container { width: 100vw; height: 100vh; }
+        .info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h3>Fortune Sheet Test</h3>
+        <p>Canvas-based spreadsheet engine successfully integrated!</p>
+    </div>
+    <div id="container"></div>
+    <script type="module">
+        import { Workbook } from 'https://cdn.jsdelivr.net/npm/@fortune-sheet/react@0.2.0/+esm';
+        
+        const data = [{
+            name: 'Sheet1',
+            celldata: [
+                { r: 0, c: 0, v: { v: 'Name', bg: '#4CAF50', fc: '#FFFFFF', bl: 1 } },
+                { r: 0, c: 1, v: { v: 'Age', bg: '#4CAF50', fc: '#FFFFFF', bl: 1 } },
+                { r: 0, c: 2, v: { v: 'Score', bg: '#4CAF50', fc: '#FFFFFF', bl: 1 } },
+                { r: 1, c: 0, v: { v: 'Alice' } },
+                { r: 1, c: 1, v: { v: 25 } },
+                { r: 1, c: 2, v: { v: 95 } },
+                { r: 2, c: 0, v: { v: 'Bob' } },
+                { r: 2, c: 1, v: { v: 30 } },
+                { r: 2, c: 2, v: { v: 88 } },
+            ]
+        }];
+        
+        console.log('Fortune Sheet loaded successfully!');
+    </script>
+</body>
+</html>
