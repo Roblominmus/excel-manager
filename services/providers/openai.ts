@@ -66,12 +66,8 @@ Choose the most appropriate format based on the query.`;
     }
 
     // Detect response type
-    let type: AIResponse['type'] = 'explanation';
-    if (content.toLowerCase().includes('```python')) {
-      type = 'python';
-    } else if (content.toLowerCase().includes('```sql')) {
-      type = 'sql';
-    } else if (content.startsWith('=') || content.includes('FORMULA:')) {
+    let type: AIResponse['type'] = 'transformation';
+    if (content.startsWith('=') || content.toLowerCase().includes('formula:')) {
       type = 'formula';
     }
 
@@ -79,6 +75,7 @@ Choose the most appropriate format based on the query.`;
       success: true,
       type,
       code: content,
+      explanation: content,
     };
   } catch (error: any) {
     console.error('[OpenAI Provider] Error:', error);

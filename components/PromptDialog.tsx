@@ -33,7 +33,8 @@ export default function PromptDialog({
     if (isOpen) {
       setValue(defaultValue);
     }
-  }, [isOpen, defaultValue]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleConfirm = () => {
     if (value.trim()) {

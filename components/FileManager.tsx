@@ -6,7 +6,6 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { useFileManager as useFileManagerHook } from '@/hooks/useFileManager';
 import { getCurrentUserId } from '@/lib/supabase/client';
 import PromptDialog from './PromptDialog';
-import ConfirmDialog from './ConfirmDialog';
 
 interface FileManagerProps {
   userId?: string;
@@ -81,35 +80,65 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
 
       const tree = buildFolderTree(folders, null);
       
-      // Add files to each folder
+      // Add files to each folder using parallel fetching
       const addFilesToTree = async (nodes: TreeNode[]): Promise<TreeNode[]> => {
-        const result: TreeNode[] = [];
-        for (const node of nodes) {
-          if (node.type === 'folder') {
-            const files = await getFilesInFolder(node.id);
-            const fileNodes: TreeNode[] = (files || []).map((f: any) => ({
-              id: f.id,
-              name: f.name,
-              type: 'file' as const,
-              size: f.size,
-              storage_path: f.storage_path,
-              folder_id: f.folder_id,
-            }));
-            
-            let children = node.children || [];
-            if (children.length > 0) {
-              children = await addFilesToTree(children);
+        // Collect all folder IDs that need files
+        const collectFolderIds = (nodes: TreeNode[]): string[] => {
+          const ids: string[] = [];
+          for (const node of nodes) {
+            if (node.type === 'folder') {
+              ids.push(node.id);
+              if (node.children && node.children.length > 0) {
+                ids.push(...collectFolderIds(node.children));
+              }
             }
-            
-            result.push({
-              ...node,
-              children: [...children, ...fileNodes],
-            });
-          } else {
-            result.push(node);
           }
-        }
-        return result;
+          return ids;
+        };
+
+        const folderIds = collectFolderIds(nodes);
+        
+        // Fetch files for all folders in parallel
+        const filesPromises = folderIds.map(id => 
+          getFilesInFolder(id).then(files => ({ folderId: id, files: files || [] }))
+        );
+        const filesResults = await Promise.all(filesPromises);
+        
+        // Create a map of folder ID to files
+        const filesMap = new Map<string, any[]>();
+        filesResults.forEach(result => {
+          filesMap.set(result.folderId, result.files);
+        });
+
+        // Recursively add files to tree
+        const attachFiles = (nodes: TreeNode[]): TreeNode[] => {
+          return nodes.map(node => {
+            if (node.type === 'folder') {
+              const files = filesMap.get(node.id) || [];
+              const fileNodes: TreeNode[] = files.map((f: any) => ({
+                id: f.id,
+                name: f.name,
+                type: 'file' as const,
+                size: f.size,
+                storage_path: f.storage_path,
+                folder_id: f.folder_id,
+              }));
+              
+              let children = node.children || [];
+              if (children.length > 0) {
+                children = attachFiles(children);
+              }
+              
+              return {
+                ...node,
+                children: [...children, ...fileNodes],
+              };
+            }
+            return node;
+          });
+        };
+
+        return attachFiles(nodes);
       };
 
       // Get root files

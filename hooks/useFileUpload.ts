@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useFileManager } from './useFileManager';
-import { sanitizeFilename } from '@/lib/utils';
+import { getUniqueFilename } from '@/lib/utils';
 
 interface UploadProgress {
   fileName: string;
@@ -16,12 +16,12 @@ interface UploadProgress {
  * Integrates with useFileManager for metadata tracking
  */
 export function useFileUpload(userId: string, parentFolderId?: string) {
-  const { uploadFile: uploadFileToManager } = useFileManager();
+  const { uploadFile: uploadFileToManager, getFilesInFolder } = useFileManager();
   const [uploads, setUploads] = useState<Record<string, UploadProgress>>({});
   const [isUploading, setIsUploading] = useState(false);
 
   const uploadFile = useCallback(
-    async (file: File, targetFolderId?: string | null) => {
+    async (file: File, targetFolderId?: string | null, autoRename: boolean = true) => {
       const fileId = `${Date.now()}-${file.name}`;
       const folderId = targetFolderId !== undefined ? targetFolderId : (parentFolderId || null);
 
@@ -32,10 +32,24 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
       setIsUploading(true);
 
       try {
+        // Check for duplicate filenames
+        let finalFileName = file.name;
+        if (autoRename) {
+          const existingFiles = await getFilesInFolder(folderId);
+          const existingNames = existingFiles.map((f: any) => f.name);
+          finalFileName = getUniqueFilename(file.name, existingNames);
+          
+          // If renamed, create a new File object with the new name
+          if (finalFileName !== file.name) {
+            const renamedFile = new File([file], finalFileName, { type: file.type });
+            file = renamedFile;
+          }
+        }
+
         // Simulate progress (Supabase doesn't provide real-time progress for now)
         setUploads(prev => ({
           ...prev,
-          [fileId]: { ...prev[fileId], progress: 30 },
+          [fileId]: { ...prev[fileId], progress: 30, fileName: finalFileName },
         }));
 
         // Upload via useFileManager hook
@@ -43,7 +57,7 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
 
         setUploads(prev => ({
           ...prev,
-          [fileId]: { ...prev[fileId], progress: 100, status: 'completed' },
+          [fileId]: { ...prev[fileId], progress: 100, status: 'completed', fileName: finalFileName },
         }));
         setIsUploading(false);
       } catch (error: any) {
@@ -60,7 +74,7 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
         throw error;
       }
     },
-    [uploadFileToManager, parentFolderId]
+    [uploadFileToManager, parentFolderId, getFilesInFolder]
   );
 
   const uploadMultipleFiles = useCallback(

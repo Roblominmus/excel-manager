@@ -45,3 +45,30 @@ export function isExcelFile(filename: string): boolean {
 export function sanitizeFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
+
+/**
+ * Generate unique filename by appending (1), (2), etc.
+ */
+export function getUniqueFilename(filename: string, existingNames: string[]): string {
+  const existingNamesSet = new Set(existingNames.map(name => name.toLowerCase()));
+  
+  if (!existingNamesSet.has(filename.toLowerCase())) {
+    return filename;
+  }
+
+  // Extract name and extension
+  const lastDotIndex = filename.lastIndexOf('.');
+  const name = lastDotIndex !== -1 ? filename.slice(0, lastDotIndex) : filename;
+  const ext = lastDotIndex !== -1 ? filename.slice(lastDotIndex) : '';
+
+  // Try appending (1), (2), etc.
+  let counter = 1;
+  let newFilename = `${name} (${counter})${ext}`;
+  
+  while (existingNamesSet.has(newFilename.toLowerCase())) {
+    counter++;
+    newFilename = `${name} (${counter})${ext}`;
+  }
+
+  return newFilename;
+}

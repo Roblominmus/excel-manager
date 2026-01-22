@@ -36,7 +36,7 @@ export default function FileConflictDialog({
           <AlertTriangle size={24} style={{ color: '#f59e0b', flexShrink: 0 }} />
           <div>
             <p className="font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-              A file named "{fileName}" already exists.
+              A file named &quot;{fileName}&quot; already exists.
             </p>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               What would you like to do?
