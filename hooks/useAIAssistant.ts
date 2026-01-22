@@ -7,7 +7,7 @@ export function useAIAssistant() {
   const [loading, setLoading] = useState(false);
   const [lastResponse, setLastResponse] = useState<AIResponse | null>(null);
 
-  const askAI = async (query: string, headers: string[], firstRow?: any[]) => {
+  const askAI = async (query: string, headers: string[], firstRow?: unknown[]) => {
     setLoading(true);
 
     try {
@@ -26,11 +26,12 @@ export function useAIAssistant() {
       const data: AIResponse = await response.json();
       setLastResponse(data);
       return data;
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to contact AI service';
       const errorResponse: AIResponse = {
         success: false,
         type: 'error',
-        error: error.message || 'Failed to contact AI service',
+        error: errorMessage,
       };
       setLastResponse(errorResponse);
       return errorResponse;
