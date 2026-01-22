@@ -64,7 +64,14 @@ export function useSpreadsheet(fileUrl?: string) {
 
       // Load data into HyperFormula
       if (hfRef.current) {
-        hfRef.current.setSheetContent(0, [headers, ...rows]);
+        // Create sheet if it doesn't exist
+        if (hfRef.current.getSheetId('Sheet1') === undefined) {
+          hfRef.current.addSheet('Sheet1');
+        }
+        const sheetId = hfRef.current.getSheetId('Sheet1');
+        if (sheetId !== undefined) {
+          hfRef.current.setSheetContent(sheetId, [headers, ...rows]);
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load spreadsheet');
@@ -83,7 +90,10 @@ export function useSpreadsheet(fileUrl?: string) {
 
     // Update HyperFormula
     if (hfRef.current && newData) {
-      hfRef.current.setSheetContent(0, [newData.headers, ...newData.rows]);
+      const sheetId = hfRef.current.getSheetId('Sheet1');
+      if (sheetId !== undefined) {
+        hfRef.current.setSheetContent(sheetId, [newData.headers, ...newData.rows]);
+      }
     }
   }, []);
 
@@ -137,7 +147,9 @@ export function useSpreadsheet(fileUrl?: string) {
     
     try {
       // HyperFormula evaluates formulas in the context of the entire sheet
-      const result = hfRef.current.calculateFormula(formula, 0);
+      const sheetId = hfRef.current.getSheetId('Sheet1');
+      if (sheetId === undefined) return formula;
+      const result = hfRef.current.calculateFormula(formula, sheetId);
       return result;
     } catch (err) {
       return `#ERROR`;

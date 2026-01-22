@@ -28,6 +28,17 @@ export default function Home() {
   const [isFullView, setIsFullView] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
+  // Clean the filename by removing timestamps and query strings
+  const cleanFileName = useCallback((url: string, providedName?: string): string => {
+    if (providedName) {
+      // Remove timestamp prefix if present (e.g., "1769076886305_claims_master_data.csv")
+      return providedName.replace(/^\d+_/, '').split('?')[0];
+    }
+    const path = url.split('?')[0]; // Remove query params
+    const filename = path.split('/').pop() || 'Untitled';
+    return filename.replace(/^\d+_/, ''); // Remove timestamp prefix
+  }, []);
+
   // Initialize theme from localStorage and system preference
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -103,8 +114,8 @@ export default function Home() {
 
     // Create new file entry
     const newFile: OpenFile = {
-      id: Date.now().toString(),
-      name: name || url.split('/').pop() || 'Untitled',
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: cleanFileName(url, name),
       url,
       data: null,
       isDirty: false,
@@ -112,7 +123,7 @@ export default function Home() {
 
     setOpenFiles(prev => [...prev, newFile]);
     setActiveFileId(newFile.id);
-  }, [openFiles]);
+  }, [openFiles, cleanFileName]);
 
   // Handle tab close
   const handleTabClose = useCallback((fileId: string) => {

@@ -5,6 +5,7 @@ import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp } from 
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useFileManager as useFileManagerHook } from '@/hooks/useFileManager';
 import { getCurrentUserId } from '@/lib/supabase/client';
+import PromptDialog from './PromptDialog';
 
 interface FileManagerProps {
   userId?: string;
@@ -34,6 +35,8 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     getFilesInFolder,
     getFileUrl,
     fetchFolderHierarchy,
+    renameFile,
+    moveFile,
   } = useFileManagerHook();
   
   const [userId, setUserId] = useState<string | null>(providedUserId || null);
@@ -41,6 +44,11 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['root']));
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  
+  // Modal states
+  const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ id: string; name: string; type: 'folder' | 'file' } | null>(null);
 
   // Get current user if not provided
   useEffect(() => {
@@ -72,35 +80,65 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
 
       const tree = buildFolderTree(folders, null);
       
-      // Add files to each folder
+      // Add files to each folder using parallel fetching
       const addFilesToTree = async (nodes: TreeNode[]): Promise<TreeNode[]> => {
-        const result: TreeNode[] = [];
-        for (const node of nodes) {
-          if (node.type === 'folder') {
-            const files = await getFilesInFolder(node.id);
-            const fileNodes: TreeNode[] = (files || []).map((f: any) => ({
-              id: f.id,
-              name: f.name,
-              type: 'file' as const,
-              size: f.size,
-              storage_path: f.storage_path,
-              folder_id: f.folder_id,
-            }));
-            
-            let children = node.children || [];
-            if (children.length > 0) {
-              children = await addFilesToTree(children);
+        // Collect all folder IDs that need files
+        const collectFolderIds = (nodes: TreeNode[]): string[] => {
+          const ids: string[] = [];
+          for (const node of nodes) {
+            if (node.type === 'folder') {
+              ids.push(node.id);
+              if (node.children && node.children.length > 0) {
+                ids.push(...collectFolderIds(node.children));
+              }
             }
-            
-            result.push({
-              ...node,
-              children: [...children, ...fileNodes],
-            });
-          } else {
-            result.push(node);
           }
-        }
-        return result;
+          return ids;
+        };
+
+        const folderIds = collectFolderIds(nodes);
+        
+        // Fetch files for all folders in parallel
+        const filesPromises = folderIds.map(id => 
+          getFilesInFolder(id).then(files => ({ folderId: id, files: files || [] }))
+        );
+        const filesResults = await Promise.all(filesPromises);
+        
+        // Create a map of folder ID to files
+        const filesMap = new Map<string, any[]>();
+        filesResults.forEach(result => {
+          filesMap.set(result.folderId, result.files);
+        });
+
+        // Recursively add files to tree
+        const attachFiles = (nodes: TreeNode[]): TreeNode[] => {
+          return nodes.map(node => {
+            if (node.type === 'folder') {
+              const files = filesMap.get(node.id) || [];
+              const fileNodes: TreeNode[] = files.map((f: any) => ({
+                id: f.id,
+                name: f.name,
+                type: 'file' as const,
+                size: f.size,
+                storage_path: f.storage_path,
+                folder_id: f.folder_id,
+              }));
+              
+              let children = node.children || [];
+              if (children.length > 0) {
+                children = attachFiles(children);
+              }
+              
+              return {
+                ...node,
+                children: [...children, ...fileNodes],
+              };
+            }
+            return node;
+          });
+        };
+
+        return attachFiles(nodes);
       };
 
       // Get root files
@@ -122,6 +160,14 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
       buildTree();
     }
   }, [userId, folders, getFilesInFolder, expandedIds]);
+
+  // Refresh tree after upload completes
+  useEffect(() => {
+    const allCompleted = Object.values(uploads).every(u => u.progress === 100);
+    if (!isUploading && allCompleted && Object.keys(uploads).length > 0) {
+      fetchFolderHierarchy();
+    }
+  }, [isUploading, uploads, fetchFolderHierarchy]);
 
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,6 +217,23 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
   const handleNodeDoubleClick = (node: TreeNode) => {
     if (node.type === 'folder') {
       toggleExpand(node.id);
+    } else {
+      // Double-click on file to rename
+      setRenameTarget({ id: node.id, name: node.name, type: node.type });
+      setRenameModalOpen(true);
+    }
+  };
+
+  const handleRename = async (newName: string) => {
+    if (!renameTarget) return;
+    
+    try {
+      if (renameTarget.type === 'file') {
+        await renameFile(renameTarget.id, newName);
+      }
+      // Note: folder rename could be added here if needed
+    } catch (error) {
+      console.error('Failed to rename:', error);
     }
   };
 
@@ -193,19 +256,23 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     setDragOverFolderId(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetFolder: TreeNode) => {
+  const handleDrop = async (e: React.DragEvent, targetFolder: TreeNode) => {
     e.preventDefault();
     setDragOverFolderId(null);
     
     if (targetFolder.type !== 'folder') return;
     
-    // Note: File/folder move functionality would require backend API support
-    // to update folder_id in the database. This is a placeholder for future implementation.
     const nodeId = e.dataTransfer.getData('nodeId');
     const nodeType = e.dataTransfer.getData('nodeType');
     
-    // Backend API call would go here:
-    // await moveFileToFolder(nodeId, targetFolder.id);
+    // Only handle file moves for now
+    if (nodeType === 'file') {
+      try {
+        await moveFile(nodeId, targetFolder.id);
+      } catch (error) {
+        console.error('Failed to move file:', error);
+      }
+    }
   };
 
   const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
@@ -278,13 +345,7 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
         <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Files</h2>
         <div className="flex gap-1">
           <button
-            onClick={() => {
-              const name = prompt('Folder name:');
-              if (name) {
-                createFolder(name, null);
-                fetchFolderHierarchy();
-              }
-            }}
+            onClick={() => setCreateFolderModalOpen(true)}
             className="p-1 hover:bg-gray-200 transition-colors"
             title="New Folder"
           >
@@ -358,6 +419,37 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
           </div>
         )}
       </div>
+
+      {/* Create Folder Modal */}
+      <PromptDialog
+        isOpen={createFolderModalOpen}
+        onClose={() => setCreateFolderModalOpen(false)}
+        onConfirm={async (name) => {
+          try {
+            await createFolder(name, null);
+            await fetchFolderHierarchy();
+          } catch (error) {
+            console.error('Failed to create folder:', error);
+          }
+        }}
+        title="New Folder"
+        message="Enter folder name:"
+        placeholder="Folder name"
+      />
+
+      {/* Rename Modal */}
+      <PromptDialog
+        isOpen={renameModalOpen}
+        onClose={() => {
+          setRenameModalOpen(false);
+          setRenameTarget(null);
+        }}
+        onConfirm={handleRename}
+        title={`Rename ${renameTarget?.type === 'file' ? 'File' : 'Folder'}`}
+        message="Enter new name:"
+        defaultValue={renameTarget?.name || ''}
+        placeholder="New name"
+      />
     </div>
   );
 }
