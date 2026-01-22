@@ -375,7 +375,7 @@ export default function Home() {
 
         {/* Center: Spreadsheet Editor */}
         <div 
-          className="flex-1 overflow-hidden" 
+          className="flex-1 overflow-auto" 
           style={{ 
             backgroundColor: 'var(--bg-primary)',
             border: '1px solid var(--border)',

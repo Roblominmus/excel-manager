@@ -215,7 +215,7 @@ export default function SpreadsheetEditor({
       </div>
 
       {/* Fortune Sheet Canvas */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-auto">
         <Workbook
           ref={workbookRef}
           data={sheets}
