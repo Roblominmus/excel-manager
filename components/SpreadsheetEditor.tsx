@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { DataGrid, Column } from 'react-data-grid';
 import { Download, Save } from 'lucide-react';
 import { useSpreadsheet } from '@/hooks/useSpreadsheet';
@@ -15,20 +15,24 @@ export default function SpreadsheetEditor({ fileUrl, onDataChange }: Spreadsheet
   const { data, loading, error, updateCell, exportToExcel } = useSpreadsheet(fileUrl);
 
   // Convert data to DataGrid format
-  const rows = data?.rows.map((row, idx) => {
-    const rowObj: any = { id: idx };
-    data.headers.forEach((header, colIdx) => {
-      rowObj[header] = row[colIdx] ?? '';
-    });
-    return rowObj;
-  }) ?? [];
+  const rows = useMemo(() => {
+    return data?.rows.map((row, idx) => {
+      const rowObj: any = { id: idx };
+      data.headers.forEach((header, colIdx) => {
+        rowObj[header] = row[colIdx] ?? '';
+      });
+      return rowObj;
+    }) ?? [];
+  }, [data]);
 
-  const columns: Column<any>[] = data?.headers.map((header) => ({
-    key: header,
-    name: header,
-    resizable: true,
-    editable: true,
-  })) ?? [];
+  const columns: Column<any>[] = useMemo(() => {
+    return data?.headers.map((header) => ({
+      key: header,
+      name: header,
+      resizable: true,
+      editable: true,
+    })) ?? [];
+  }, [data]);
 
   const handleRowsChange = (newRows: any[]) => {
     if (!data) return;

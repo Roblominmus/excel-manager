@@ -21,8 +21,9 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
   const [isUploading, setIsUploading] = useState(false);
 
   const uploadFile = useCallback(
-    async (file: File) => {
+    async (file: File, targetFolderId?: string | null) => {
       const fileId = `${Date.now()}-${file.name}`;
+      const folderId = targetFolderId !== undefined ? targetFolderId : (parentFolderId || null);
 
       setUploads(prev => ({
         ...prev,
@@ -38,7 +39,7 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
         }));
 
         // Upload via useFileManager hook
-        await uploadFileToManager(file, parentFolderId || null);
+        await uploadFileToManager(file, folderId);
 
         setUploads(prev => ({
           ...prev,
@@ -63,9 +64,9 @@ export function useFileUpload(userId: string, parentFolderId?: string) {
   );
 
   const uploadMultipleFiles = useCallback(
-    async (files: File[]) => {
+    async (files: File[], targetFolderId?: string | null) => {
       setIsUploading(true);
-      const uploadPromises = files.map(file => uploadFile(file));
+      const uploadPromises = files.map(file => uploadFile(file, targetFolderId));
       
       try {
         await Promise.all(uploadPromises);

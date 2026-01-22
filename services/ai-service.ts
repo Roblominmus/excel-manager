@@ -19,10 +19,10 @@ import { makeXAIRequest } from './providers/xai';
  * Provider configuration in priority order
  */
 const PROVIDERS = [
-  { name: 'DeepSeek', handler: makeDeepSeekRequest },
-  { name: 'Cohere', handler: makeCohereRequest },
   { name: 'Groq', handler: makeGroqRequest },
+  { name: 'DeepSeek', handler: makeDeepSeekRequest },
   { name: 'X.AI', handler: makeXAIRequest },
+  { name: 'Cohere', handler: makeCohereRequest },
 ];
 
 /**

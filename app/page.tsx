@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import FileManager from '@/components/FileManager';
 import SpreadsheetEditor from '@/components/SpreadsheetEditor';
@@ -14,6 +14,9 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [currentFileUrl, setCurrentFileUrl] = useState<string>();
   const [spreadsheetData, setSpreadsheetData] = useState<SpreadsheetData>();
+  const [leftWidth, setLeftWidth] = useState(320);
+  const [rightWidth, setRightWidth] = useState(384);
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
 
   // Check authentication
   useEffect(() => {
@@ -31,6 +34,36 @@ export default function Home() {
     };
     checkAuth();
   }, [router]);
+
+  const clamp = useCallback((value: number, min: number, max: number) => {
+    return Math.min(Math.max(value, min), max);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!dragging) return;
+      const viewportWidth = window.innerWidth;
+      if (dragging === 'left') {
+        const maxLeft = viewportWidth - rightWidth - 400; // leave room for center + right
+        setLeftWidth(clamp(event.clientX, 200, Math.max(260, maxLeft)));
+      }
+      if (dragging === 'right') {
+        const available = viewportWidth - event.clientX;
+        const maxRight = viewportWidth - leftWidth - 400;
+        setRightWidth(clamp(available, 260, Math.max(300, maxRight)));
+      }
+    };
+
+    const handleMouseUp = () => setDragging(null);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging, clamp, rightWidth, leftWidth]);
 
   if (loading) {
     return (
@@ -74,11 +107,20 @@ export default function Home() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: File Manager */}
-        <div className="w-80 border-r overflow-auto">
+        <div
+          className="border-r overflow-auto"
+          style={{ width: `${leftWidth}px` }}
+        >
           <FileManager 
             onFileSelect={(url: string) => setCurrentFileUrl(url)}
           />
         </div>
+
+        {/* Left Resizer */}
+        <div
+          className="w-2 cursor-col-resize bg-gray-100 hover:bg-gray-200"
+          onMouseDown={() => setDragging('left')}
+        />
 
         {/* Center: Spreadsheet Editor */}
         <div className="flex-1 overflow-auto">
@@ -97,7 +139,16 @@ export default function Home() {
         </div>
 
         {/* Right: AI Assistant */}
-        <div className="w-96">
+        {/* Right Resizer */}
+        <div
+          className="w-2 cursor-col-resize bg-gray-100 hover:bg-gray-200"
+          onMouseDown={() => setDragging('right')}
+        />
+
+        <div
+          className="border-l"
+          style={{ width: `${rightWidth}px` }}
+        >
           <AIAssistant 
             spreadsheetData={spreadsheetData}
             onApplyCode={(code, type) => {

@@ -370,14 +370,20 @@ export function useFileManager() {
   );
 
   /**
-   * Get a public URL for a file (for viewing without download)
+   * Get a temporary signed URL for a private file
    */
-  const getFileUrl = useCallback((storagePath: string) => {
-    const { data } = supabase.storage
-      .from('spreadsheets')
-      .getPublicUrl(storagePath);
+  const getFileUrl = useCallback(async (storagePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('spreadsheets')
+        .createSignedUrl(storagePath, 3600); // Valid for 1 hour
 
-    return data.publicUrl;
+      if (error) throw error;
+      return data.signedUrl;
+    } catch (error) {
+      console.error('[FileManager] Error getting signed URL:', error);
+      return null;
+    }
   }, []);
 
   // Initial fetch
