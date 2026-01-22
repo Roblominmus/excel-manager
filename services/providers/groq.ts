@@ -19,26 +19,30 @@ export async function makeGroqRequest(
     };
   }
 
-  const systemPrompt = `You are an Excel formula and data transformation expert. 
-You will receive a spreadsheet schema (column headers and types), the actual spreadsheet data, and a user's natural language request.
-Your job is to output ONLY valid Excel formulas that can operate on the provided data.
+  const systemPrompt = `You are an Excel formula and data analysis expert with access to ACTUAL spreadsheet data.
+When asked about data, analyze the rows provided and give COMPUTED ANSWERS, not just formulas.
 
-You can access the full spreadsheet data to understand context and generate accurate formulas.
-For example, if asked to sum a column, generate: =SUM(A:A) 
-For average: =AVERAGE(B:B)
-For counting with conditions: =COUNTIF(A:A,">=100")
+IMPORTANT:
+- Use fuzzy matching for names (e.g., "acme" should match "Acme Corp", "Acme Inc", etc.)
+- When asked for totals, sums, or counts - CALCULATE and return the actual number
+- Provide both the formula AND the computed result when applicable
+- Look at the actual data values to understand context
+
+Available data:
+Headers: ${schema.headers?.join(', ') || 'None'}
+Row count: ${(schema as any).rowCount || 0}
+Sample data: ${JSON.stringify((schema as any).sampleRows?.slice(0, 5) || [])}
 
 Return a JSON response with:
 {
   "type": "formula",
   "code": "the Excel formula",
-  "explanation": "brief explanation of what the formula does"
+  "explanation": "brief explanation with computed result if applicable"
 }`;
 
-  const userPrompt = `Schema: ${JSON.stringify(schema)}
-User Request: ${query}
+  const userPrompt = `User Request: ${query}
 
-Generate the appropriate Excel formula to answer this request.`;
+Analyze the spreadsheet data and generate the appropriate Excel formula. If the request asks for a calculation, compute the actual result from the sample data provided.`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -80,11 +84,12 @@ Generate the appropriate Excel formula to answer this request.`;
       explanation: parsed.explanation,
       provider: 'Groq',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Groq request failed';
     return {
       success: false,
       type: 'error',
-      error: error.message || 'Groq request failed',
+      error: errorMessage,
       provider: 'Groq',
     };
   }

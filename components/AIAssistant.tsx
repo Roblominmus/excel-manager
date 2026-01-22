@@ -107,13 +107,17 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
       code: response.success ? response.code : undefined,
     };
 
-    // If it's a formula and we can evaluate it, calculate the result
+    // If it's a formula and we can evaluate it, try to calculate the result
     if (response.success && response.type === 'formula' && response.code && evaluateFormula) {
       try {
         const result = evaluateFormula(response.code);
-        assistantMessage.content += `\n\n**Result:** \`${result}\``;
-      } catch (error: any) {
+        // Only add result if it's different from the formula and not an error
+        if (result !== response.code && String(result) !== '#ERROR' && String(result) !== 'ERROR') {
+          assistantMessage.content += `\n\n**Computed Result:** \`${result}\``;
+        }
+      } catch (error) {
         console.error('Formula evaluation error:', error);
+        // Don't show error to user, just log it
       }
     }
 

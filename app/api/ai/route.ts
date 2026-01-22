@@ -17,9 +17,17 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Use first row for schema, but send context about full data being available
+    // Extract schema and pass full row data for AI to analyze
     const schema = extractSchema(headers, rows && rows.length > 0 ? rows[0] : undefined);
-    const response = await makeAIRequest(query, schema);
+    
+    // Add full data context to schema for better AI responses
+    const enhancedSchema = {
+      ...schema,
+      rowCount: rows?.length || 0,
+      sampleRows: rows?.slice(0, 20) || [], // Send first 20 rows as sample
+    };
+    
+    const response = await makeAIRequest(query, enhancedSchema);
     
     return NextResponse.json(response);
   } catch (error) {
