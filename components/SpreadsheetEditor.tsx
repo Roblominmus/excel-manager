@@ -57,7 +57,7 @@ export default function SpreadsheetEditor({
         // If it's a formula, evaluate it
         if (typeof cellValue === 'string' && cellValue.startsWith('=')) {
           try {
-            const result = evaluateFormula(cellValue, idx, colIdx);
+            const result = evaluateFormula(cellValue);
             rowObj[header] = result;
           } catch {
             rowObj[header] = cellValue;

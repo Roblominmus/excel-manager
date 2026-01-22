@@ -132,11 +132,11 @@ export function useSpreadsheet(fileUrl?: string) {
     });
   }, []);
 
-  const evaluateFormula = useCallback((formula: string, row: number, col: number): any => {
+  const evaluateFormula = useCallback((formula: string): any => {
     if (!hfRef.current) return formula;
     
     try {
-      // HyperFormula uses 0-based indexing
+      // HyperFormula evaluates formulas in the context of the entire sheet
       const result = hfRef.current.calculateFormula(formula, 0);
       return result;
     } catch (err) {

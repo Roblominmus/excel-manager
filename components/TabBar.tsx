@@ -2,14 +2,7 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
-
-export interface OpenFile {
-  id: string;
-  name: string;
-  url: string;
-  data: any;
-  isDirty: boolean;
-}
+import { OpenFile } from '@/types/spreadsheet';
 
 interface TabBarProps {
   files: OpenFile[];

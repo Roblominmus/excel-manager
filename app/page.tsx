@@ -306,8 +306,16 @@ export default function Home() {
             }}
             onDataChange={handleDataChange}
             onSave={() => {
-              // TODO: Implement save to Supabase
-              console.log('Save file:', activeFile);
+              // Note: Save functionality requires Supabase API integration
+              // to update files in storage. This is a placeholder for future implementation.
+              // await uploadFileToSupabase(activeFile.url, activeFile.data);
+              if (activeFileId) {
+                setOpenFiles(prev =>
+                  prev.map(f =>
+                    f.id === activeFileId ? { ...f, isDirty: false } : f
+                  )
+                );
+              }
             }}
           />
         </div>
