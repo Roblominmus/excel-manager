@@ -65,14 +65,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--gray-100) 100%)' }}>
+      <div className="rounded-2xl shadow-xl w-full max-w-md p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             Excel Manager
           </h1>
-          <p className="text-gray-600">
+          <p style={{ color: 'var(--text-secondary)' }}>
             {mode === 'signin'
               ? 'Sign in to your account'
               : 'Create a new account'}
@@ -97,7 +97,8 @@ export default function Login() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium mb-2"
+              style={{ color: 'var(--text-primary)' }}
             >
               Email Address
             </label>
@@ -108,7 +109,12 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              style={{
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+              }}
               disabled={loading}
             />
           </div>
@@ -117,7 +123,8 @@ export default function Login() {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium mb-2"
+              style={{ color: 'var(--text-primary)' }}
             >
               Password
             </label>
@@ -129,11 +136,16 @@ export default function Login() {
               required
               placeholder="••••••••"
               minLength={6}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              style={{
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+              }}
               disabled={loading}
             />
             {mode === 'signup' && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 Must be at least 6 characters
               </p>
             )}
