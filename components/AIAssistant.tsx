@@ -46,12 +46,48 @@ export default function AIAssistant({ spreadsheetData, onApplyCode }: AIAssistan
       spreadsheetData.rows[0]
     );
 
+    // Check for API key configuration errors
+    const isConfigError = response.error?.includes('not configured') || 
+                          response.error?.includes('API key');
+
+    let assistantContent: string;
+    if (response.success) {
+      assistantContent = `${response.explanation}\n\n\`\`\`${response.type === 'formula' ? 'excel' : 'javascript'}\n${response.code}\n\`\`\``;
+    } else if (isConfigError) {
+      assistantContent = `⚙️ **AI Configuration Required**
+
+To use the AI assistant, you need to configure API keys for at least one AI provider.
+
+**Supported Providers:**
+- Groq (fast, recommended)
+- DeepSeek
+- OpenAI
+- Anthropic
+
+**How to configure:**
+1. Create a \`.env.local\` file in the project root
+2. Add your API keys:
+   \`\`\`
+   GROQ_API_KEY=your_key_here
+   DEEPSEEK_API_KEY=your_key_here
+   OPENAI_API_KEY=your_key_here
+   ANTHROPIC_API_KEY=your_key_here
+   \`\`\`
+3. Restart the development server
+
+Get API keys from:
+- Groq: https://console.groq.com
+- DeepSeek: https://platform.deepseek.com
+- OpenAI: https://platform.openai.com
+- Anthropic: https://console.anthropic.com`;
+    } else {
+      assistantContent = `❌ Error: ${response.error}`;
+    }
+
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
-      content: response.success
-        ? `${response.explanation}\n\n\`\`\`${response.type === 'formula' ? 'excel' : 'javascript'}\n${response.code}\n\`\`\``
-        : `Error: ${response.error}`,
+      content: assistantContent,
       provider: response.provider,
     };
     setMessages(prev => [...prev, assistantMessage]);

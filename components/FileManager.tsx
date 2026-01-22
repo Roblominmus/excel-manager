@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useCallback, useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp } from 'lucide-react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp, Edit2, Trash2 } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useFileManager as useFileManagerHook } from '@/hooks/useFileManager';
 import { getCurrentUserId } from '@/lib/supabase/client';
+import PromptDialog from './PromptDialog';
+import ConfirmDialog from './ConfirmDialog';
 
 interface FileManagerProps {
   userId?: string;
@@ -35,6 +37,10 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     getFileUrl,
     fetchFolderHierarchy,
     moveFile,
+    renameFile,
+    renameFolder,
+    deleteFile,
+    deleteFolder,
   } = useFileManagerHook();
   
   const [userId, setUserId] = useState<string | null>(providedUserId || null);
@@ -43,6 +49,13 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['root']));
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const prevIsUploading = useRef(isUploading);
+
+  // Dialog states
+  const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [renamingNode, setRenamingNode] = useState<TreeNode | null>(null);
+  const [deletingNode, setDeletingNode] = useState<TreeNode | null>(null);
 
   // Refresh file hierarchy after uploads complete
   useEffect(() => {
@@ -186,6 +199,57 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     }
   };
 
+  const handleRename = (node: TreeNode) => {
+    setRenamingNode(node);
+    setShowRenameDialog(true);
+  };
+
+  const handleDelete = (node: TreeNode) => {
+    setDeletingNode(node);
+    setShowDeleteDialog(true);
+  };
+
+  const handleRenameSubmit = async (newName: string) => {
+    if (!renamingNode || !newName.trim()) return;
+
+    try {
+      if (renamingNode.type === 'folder') {
+        await renameFolder(renamingNode.id, newName);
+      } else {
+        await renameFile(renamingNode.id, newName);
+      }
+      await fetchFolderHierarchy();
+    } catch (error) {
+      console.error('Failed to rename:', error);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingNode) return;
+
+    try {
+      if (deletingNode.type === 'folder') {
+        await deleteFolder(deletingNode.id);
+      } else if (deletingNode.storage_path) {
+        await deleteFile(deletingNode.id, deletingNode.storage_path);
+      }
+      await fetchFolderHierarchy();
+    } catch (error) {
+      console.error('Failed to delete:', error);
+    }
+  };
+
+  const handleCreateFolder = async (folderName: string) => {
+    if (!folderName.trim()) return;
+    
+    try {
+      await createFolder(folderName, null);
+      await fetchFolderHierarchy();
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+    }
+  };
+
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, node: TreeNode) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -233,12 +297,12 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     return (
       <div key={node.id}>
         <div
-          className={`flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors ${
+          className={`group flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors ${
             isSelected 
               ? 'bg-blue-100' 
               : isDragOver
               ? 'bg-blue-50'
-              : ''
+              : 'hover:bg-gray-100'
           }`}
           style={{ 
             paddingLeft: `${depth * 16 + 8}px`,
@@ -277,6 +341,30 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
             </>
           )}
           <span className="text-sm truncate flex-1">{node.name}</span>
+          
+          {/* Action buttons - visible on hover */}
+          <div className="hidden group-hover:flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRename(node);
+              }}
+              className="p-1 hover:bg-gray-300 transition-colors"
+              title="Rename"
+            >
+              <Edit2 size={12} style={{ color: 'var(--text-secondary)' }} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(node);
+              }}
+              className="p-1 hover:bg-red-100 transition-colors"
+              title="Delete"
+            >
+              <Trash2 size={12} style={{ color: '#dc2626' }} />
+            </button>
+          </div>
         </div>
         {node.type === 'folder' && isExpanded && hasChildren && (
           <div>
@@ -294,13 +382,7 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
         <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Files</h2>
         <div className="flex gap-1">
           <button
-            onClick={() => {
-              const name = prompt('Folder name:');
-              if (name) {
-                createFolder(name, null);
-                fetchFolderHierarchy();
-              }
-            }}
+            onClick={() => setShowNewFolderDialog(true)}
             className="p-1 hover:bg-gray-200 transition-colors"
             title="New Folder"
           >
@@ -374,6 +456,53 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
           </div>
         )}
       </div>
+
+      {/* Dialogs */}
+      <PromptDialog
+        isOpen={showNewFolderDialog}
+        onClose={() => setShowNewFolderDialog(false)}
+        onSubmit={handleCreateFolder}
+        title="Create New Folder"
+        placeholder="Folder name"
+        validator={(value) => {
+          if (!value.trim()) return 'Folder name cannot be empty';
+          if (value.length > 100) return 'Folder name is too long';
+          return null;
+        }}
+      />
+
+      <PromptDialog
+        isOpen={showRenameDialog}
+        onClose={() => {
+          setShowRenameDialog(false);
+          setRenamingNode(null);
+        }}
+        onSubmit={handleRenameSubmit}
+        title={`Rename ${renamingNode?.type === 'folder' ? 'Folder' : 'File'}`}
+        placeholder="New name"
+        defaultValue={renamingNode?.name || ''}
+        validator={(value) => {
+          if (!value.trim()) return 'Name cannot be empty';
+          if (value.length > 255) return 'Name is too long';
+          return null;
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeletingNode(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title={`Delete ${deletingNode?.type === 'folder' ? 'Folder' : 'File'}`}
+        message={`Are you sure you want to delete "${deletingNode?.name}"? This action cannot be undone.${
+          deletingNode?.type === 'folder' ? ' All contents will be deleted.' : ''
+        }`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }
