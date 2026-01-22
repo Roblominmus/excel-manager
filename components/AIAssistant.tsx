@@ -40,22 +40,22 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
     },
   ]);
   const [input, setInput] = useState('');
-  const [savedFormulas, setSavedFormulas] = useState<SavedFormula[]>([]);
-  const [showSavedFormulas, setShowSavedFormulas] = useState(false);
-  const { askAI, loading } = useAIAssistant();
-
-  // Load saved formulas from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('savedFormulas');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSavedFormulas(parsed);
-      } catch (e) {
-        console.error('Failed to load saved formulas:', e);
+  const [savedFormulas, setSavedFormulas] = useState<SavedFormula[]>(() => {
+    // Initialize from localStorage on mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('savedFormulas');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to load saved formulas:', e);
+        }
       }
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return [];
+  });
+  const [showSavedFormulas, setShowSavedFormulas] = useState(false);
+  const { askAI, loading } = useAIAssistant();
 
   // Save formula to localStorage
   const saveFormula = useCallback((formula: string, description: string) => {
@@ -102,7 +102,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
       role: 'assistant',
       content: response.success
         ? `${response.explanation}\n\n\`\`\`excel\n${response.code}\n\`\`\``
-        : `Error: ${response.error}`,
+        : `I encountered an issue processing your request.\n\n**Error**: ${response.error}\n\n**Tip**: Try rephrasing your question or ensure you have a spreadsheet loaded with data.`,
       provider: response.provider,
       code: response.success ? response.code : undefined,
     };

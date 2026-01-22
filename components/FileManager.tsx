@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp, MoreVertical, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp, MoreVertical, Trash2, RefreshCw } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useFileManager as useFileManagerHook } from '@/hooks/useFileManager';
 import { getCurrentUserId } from '@/lib/supabase/client';
@@ -517,7 +517,8 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
           {/* Three-dot menu button */}
           <button
             onClick={(e) => showContextMenu(e, node)}
-            className={`p-1 hover:bg-gray-300 rounded transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            className={`p-1 hover:bg-gray-300 rounded transition-opacity ${isHovered || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            style={{ pointerEvents: 'auto' }}
             title="More options"
           >
             <MoreVertical size={12} style={{ color: 'var(--text-secondary)' }} />
@@ -538,6 +539,14 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--gray-50)' }}>
         <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Files</h2>
         <div className="flex gap-1">
+          <button
+            onClick={fetchFolderHierarchy}
+            className="p-1 hover:bg-gray-200 transition-colors"
+            title="Refresh Files"
+            disabled={loading}
+          >
+            <RefreshCw size={16} style={{ color: 'var(--text-secondary)' }} className={loading ? 'animate-spin' : ''} />
+          </button>
           <button
             onClick={() => setCreateFolderModalOpen(true)}
             className="p-1 hover:bg-gray-200 transition-colors"
