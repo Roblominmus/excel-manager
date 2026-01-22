@@ -74,9 +74,12 @@ export default function SpreadsheetEditor({
   const handleCellClick = useCallback((args: { column: any; row: any; rowIdx: number }) => {
     if (!data) return;
     
+    // Skip if clicking on row number column
+    if (args.column.key === '__row_number__') return;
+    
     // Find column index from column key
-    const colIdx = data.headers.indexOf(args.column.key === '__row_number__' ? data.headers[0] : args.column.key);
-    if (colIdx === -1 || args.column.key === '__row_number__') return;
+    const colIdx = data.headers.indexOf(args.column.key);
+    if (colIdx === -1) return;
     
     setSelectedPosition({ idx: colIdx, rowIdx: args.rowIdx });
     const rawValue = data.rows[args.rowIdx]?.[colIdx] ?? '';
@@ -122,13 +125,14 @@ export default function SpreadsheetEditor({
     }) ?? [];
   }, [data, evaluateFormula]);
 
-  // Get column letter from index (0 = A, 1 = B, etc.)
+  // Get column letter from index (0 = A, 1 = B, 25 = Z, 26 = AA, etc.)
   const getColumnLetter = (index: number): string => {
     let letter = '';
-    let num = index;
-    while (num >= 0) {
-      letter = String.fromCharCode(65 + (num % 26)) + letter;
-      num = Math.floor(num / 26) - 1;
+    let num = index + 1; // Convert 0-based to 1-based
+    while (num > 0) {
+      const remainder = (num - 1) % 26;
+      letter = String.fromCharCode(65 + remainder) + letter;
+      num = Math.floor((num - 1) / 26);
     }
     return letter;
   };
@@ -434,10 +438,12 @@ export default function SpreadsheetEditor({
           <button
             onClick={() => {
               if (!findText || !data) return;
+              // Escape special regex characters to prevent ReDoS
+              const escapedFind = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               const newRows = data.rows.map(row => 
                 row.map(cell => 
                   typeof cell === 'string' && cell.includes(findText) 
-                    ? cell.replace(new RegExp(findText, 'g'), replaceText)
+                    ? cell.split(findText).join(replaceText)
                     : cell
                 )
               );

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Send, Bot, User, Trash2, X, Save, Copy } from 'lucide-react';
 import { useAIAssistant } from '@/hooks/useAIAssistant';
 import { SpreadsheetData } from '@/types/spreadsheet';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import type { Components } from 'react-markdown';
 
 interface Message {
   id: string;
@@ -277,7 +278,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
               {message.role === 'assistant' ? (
                 <ReactMarkdown
                   components={{
-                    code({ node, inline, className, children, ...props }: any) {
+                    code({ inline, className, children, ...props }) {
                       const match = /language-(\w+)/.exec(className || '');
                       return !inline && match ? (
                         <SyntaxHighlighter 
@@ -298,7 +299,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
                     strong({ children }) {
                       return <strong className="font-semibold">{children}</strong>;
                     },
-                  }}
+                  } as Components}
                 >
                   {message.content}
                 </ReactMarkdown>
@@ -311,7 +312,13 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
               {message.role === 'assistant' && message.code && (
                 <div className="mt-2 flex gap-2">
                   <button
-                    onClick={() => saveFormula(message.code!, messages.find(m => m.id === (parseInt(message.id) - 1).toString())?.content || 'Formula')}
+                    onClick={() => {
+                      // Get the user message that prompted this response
+                      const userMsgIndex = messages.findIndex(m => m.id === message.id) - 1;
+                      const userMsg = userMsgIndex >= 0 ? messages[userMsgIndex] : null;
+                      const description = userMsg?.content || 'Formula';
+                      saveFormula(message.code!, description);
+                    }}
                     className="px-2 py-1 text-xs rounded flex items-center gap-1"
                     style={{ 
                       backgroundColor: 'var(--primary)', 
