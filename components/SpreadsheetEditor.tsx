@@ -232,9 +232,6 @@ export default function SpreadsheetEditor({
           showSheetTabs={true}
           lang="en"
           hooks={{
-            afterCellMouseDown: (_cell: unknown, _cellInfo: unknown) => {
-              // Track cell selection for formula bar
-            },
             afterUpdateCell: (_r: number, _c: number, _oldVal: unknown, _newVal: unknown) => {
               setIsDirty(true);
             },

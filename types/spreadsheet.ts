@@ -35,6 +35,11 @@ export interface SpreadsheetData {
   headers: string[];
   rows: any[][];
   styles?: CellStyle[][];
+  /** 
+   * Optional metadata. Fields are optional to allow flexibility 
+   * when data is being constructed or converted from different sources.
+   * Existing code should handle undefined values gracefully.
+   */
   metadata?: {
     sheetName?: string;
     rowCount?: number;

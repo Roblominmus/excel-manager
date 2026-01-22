@@ -27,7 +27,7 @@ export function useCanvasSpreadsheet() {
       if (url.includes('.csv')) {
         const text = new TextDecoder().decode(arrayBuffer);
         const rows = text.split('\n').map(row => row.split(','));
-        const sheet = convertToFortuneSheet('Sheet1', rows, []);
+        const sheet = convertToFortuneSheet('Sheet1', rows);
         setSheets([sheet]);
       } else {
         // Excel or ODS format
@@ -180,8 +180,8 @@ export function useCanvasSpreadsheet() {
   /**
    * Convert Fortune Sheet data to simple array format
    */
-  const convertToFortuneSheet = (name: string, rows: any[][], styles: any[]): Sheet => {
-    const celldata: any[] = [];
+  const convertToFortuneSheet = (name: string, rows: unknown[][]): Sheet => {
+    const celldata: unknown[] = [];
     rows.forEach((row, r) => {
       row.forEach((cell, c) => {
         if (cell !== undefined && cell !== null && cell !== '') {
@@ -266,13 +266,14 @@ export function useCanvasSpreadsheet() {
 
   /**
    * Export to ODS format (LibreOffice)
+   * Note: Currently exports as XLSX which LibreOffice can open and save as ODS.
+   * For true ODS export, a dedicated ODS library would be needed.
    */
   const exportToODS = useCallback(async (filename: string) => {
-    // ExcelJS doesn't support ODS directly, but we can use xlsx library for this
-    // For now, export as XLSX which LibreOffice can open
-    // TODO: Add true ODS support with a dedicated library
+    // ExcelJS doesn't support ODS export directly
+    // Export as XLSX which is compatible with LibreOffice
+    // Users can then save as ODS in LibreOffice if needed
     await exportToExcel(filename);
-    // Note: User can save as ODS in LibreOffice
   }, [exportToExcel]);
 
   /**
