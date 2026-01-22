@@ -37,6 +37,8 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     fetchFolderHierarchy,
     renameFile,
     moveFile,
+    deleteFile,
+    deleteFolder,
   } = useFileManagerHook();
   
   const [userId, setUserId] = useState<string | null>(providedUserId || null);
@@ -233,6 +235,8 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
         }
         
         // Upload files to their respective folders
+        // Note: Sequential upload is intentional to avoid overwhelming the server
+        // and to maintain proper upload order for tracking
         for (const file of files) {
           const relativePath = (file as any).webkitRelativePath;
           if (!relativePath) continue;
@@ -344,15 +348,50 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
         setRenameModalOpen(true);
         break;
       case 'delete':
-        // TODO: Implement delete functionality
-        console.log('Delete:', node.name);
+        try {
+          if (node.type === 'file') {
+            if (!node.storage_path) {
+              console.error('File has no storage path');
+              return;
+            }
+            await deleteFile(node.id, node.storage_path);
+          } else {
+            await deleteFolder(node.id);
+          }
+          await fetchFolderHierarchy();
+        } catch (error) {
+          console.error('Failed to delete:', error);
+        }
         break;
     }
   };
 
   const handleDeleteSelected = async () => {
-    // TODO: Implement bulk delete
-    console.log('Delete selected:', selectedIds);
+    try {
+      // Delete all selected items
+      const deletePromises: Promise<void>[] = [];
+      
+      for (const id of selectedIds) {
+        const node = findNodeById(treeData, id);
+        if (!node) continue;
+        
+        if (node.type === 'file') {
+          if (!node.storage_path) {
+            console.error('File has no storage path:', node.name);
+            continue;
+          }
+          deletePromises.push(deleteFile(id, node.storage_path));
+        } else {
+          deletePromises.push(deleteFolder(id));
+        }
+      }
+      
+      await Promise.all(deletePromises);
+      setSelectedIds(new Set()); // Clear selection
+      await fetchFolderHierarchy();
+    } catch (error) {
+      console.error('Failed to delete selected items:', error);
+    }
   };
 
   const findNodeById = (nodes: TreeNode[], id: string): TreeNode | null => {
