@@ -381,13 +381,7 @@ export default function AIAssistant({ spreadsheetData, evaluateFormula, onApplyC
           <input
             type="text"
             value={input}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              // Only update state if value actually changed
-              if (newValue !== input) {
-                setInput(newValue);
-              }
-            }}
+            onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask me to create formulas..."
             disabled={!spreadsheetData || loading}

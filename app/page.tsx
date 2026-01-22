@@ -49,9 +49,10 @@ export default function Home() {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const initialTheme = (savedTheme as 'light' | 'dark') || (prefersDark ? 'dark' : 'light');
     
-    // Only update if different to avoid cascading renders
+    // Update document attribute immediately
+    document.documentElement.setAttribute('data-theme', initialTheme);
+    // Set state after DOM update to avoid re-render issues
     if (theme !== initialTheme) {
-      document.documentElement.setAttribute('data-theme', initialTheme);
       setTheme(initialTheme);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

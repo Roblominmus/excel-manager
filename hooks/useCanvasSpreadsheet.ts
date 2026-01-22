@@ -6,6 +6,17 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
+// Type definition for Fortune Sheet cell data
+interface FortuneCellData {
+  r: number;
+  c: number;
+  v: {
+    v: unknown;
+    m: string;
+    [key: string]: unknown;
+  } | unknown;
+}
+
 export function useCanvasSpreadsheet() {
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [loading, setLoading] = useState(false);
@@ -182,7 +193,7 @@ export function useCanvasSpreadsheet() {
    * Convert Fortune Sheet data to simple array format
    */
   const convertToFortuneSheet = (name: string, rows: unknown[][]): Sheet => {
-    const celldata: any[] = [];
+    const celldata: FortuneCellData[] = [];
     rows.forEach((row, r) => {
       row.forEach((cell, c) => {
         if (cell !== undefined && cell !== null && cell !== '') {
@@ -294,7 +305,7 @@ export function useCanvasSpreadsheet() {
   }, [sheets]);
 
   /**
-   * Export to CSV
+   * Export to CSV with proper escaping to prevent CSV injection
    */
   const exportToCSV = useCallback((filename: string) => {
     if (sheets.length === 0) return;
@@ -306,7 +317,27 @@ export function useCanvasSpreadsheet() {
       sheet.celldata.forEach((cell: any) => {
         if (!rows[cell.r]) rows[cell.r] = [];
         const value = typeof cell.v === 'object' ? cell.v.v : cell.v;
-        rows[cell.r][cell.c] = String(value ?? '');
+        const stringValue = String(value ?? '');
+        
+        // Escape values to prevent CSV injection
+        // Wrap in quotes if contains comma, quote, newline, or starts with =, +, -, @, tab, or carriage return
+        let escaped = stringValue;
+        if (
+          stringValue.includes(',') || 
+          stringValue.includes('"') || 
+          stringValue.includes('\n') ||
+          /^[=+\-@\t\r]/.test(stringValue)
+        ) {
+          // Escape double quotes by doubling them
+          escaped = '"' + stringValue.replace(/"/g, '""') + '"';
+          
+          // Prepend single quote to prevent formula execution
+          if (/^[=+\-@]/.test(stringValue)) {
+            escaped = "'" + stringValue;
+          }
+        }
+        
+        rows[cell.r][cell.c] = escaped;
       });
     }
     
