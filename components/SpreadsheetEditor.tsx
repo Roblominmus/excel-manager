@@ -82,6 +82,7 @@ export default function SpreadsheetEditor({
       resizable: true,
       editable: true,
       width: 120,
+      editor: undefined, // Use default text editor explicitly
     })) ?? [];
   }, [data]);
 

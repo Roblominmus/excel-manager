@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, File, Plus, Upload, FolderUp, MoreVertical, Trash2 } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useFileManager as useFileManagerHook } from '@/hooks/useFileManager';
 import { getCurrentUserId } from '@/lib/supabase/client';
@@ -37,13 +37,17 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     fetchFolderHierarchy,
     renameFile,
     moveFile,
+    deleteFile,
+    deleteFolder,
   } = useFileManagerHook();
   
   const [userId, setUserId] = useState<string | null>(providedUserId || null);
   const [treeData, setTreeData] = useState<TreeNode[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['root']));
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   
   // Modal states
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
@@ -181,15 +185,79 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
 
   // Handle folder upload with webkitdirectory
   const handleFolderInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files) {
-        const selectedFiles = Array.from(e.target.files);
-        // Note: Full recursive folder creation would require backend API support
-        // For now, upload all files to root folder
-        uploadMultipleFiles(selectedFiles);
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files || e.target.files.length === 0) return;
+      
+      const files = Array.from(e.target.files);
+      
+      // Get the root folder name from the first file's path
+      const firstPath = (files[0] as any).webkitRelativePath || '';
+      const rootFolderName = firstPath.split('/')[0];
+      
+      if (!rootFolderName) {
+        // Fallback to simple upload if no folder structure
+        uploadMultipleFiles(files);
+        return;
+      }
+      
+      try {
+        // Create the root folder first
+        const rootFolder = await createFolder(rootFolderName, null);
+        
+        // Build folder structure map
+        const folderMap = new Map<string, string>();
+        folderMap.set(rootFolderName, rootFolder.id);
+        
+        // Get all unique folder paths and create them
+        const folderPaths = new Set<string>();
+        files.forEach(file => {
+          const relativePath = (file as any).webkitRelativePath;
+          if (!relativePath) return;
+          
+          const parts = relativePath.split('/');
+          // Skip first (root) and last (file) - get intermediate folders
+          for (let i = 1; i < parts.length - 1; i++) {
+            const folderPath = parts.slice(0, i + 1).join('/');
+            folderPaths.add(folderPath);
+          }
+        });
+        
+        // Create subfolders in order (parent folders first)
+        const sortedPaths = Array.from(folderPaths).sort();
+        for (const path of sortedPaths) {
+          const parts = path.split('/');
+          const folderName = parts[parts.length - 1];
+          const parentPath = parts.slice(0, -1).join('/');
+          const parentId = folderMap.get(parentPath) || rootFolder.id;
+          
+          const newFolder = await createFolder(folderName, parentId);
+          folderMap.set(path, newFolder.id);
+        }
+        
+        // Upload files to their respective folders
+        // Note: Sequential upload is intentional to avoid overwhelming the server
+        // and to maintain proper upload order for tracking
+        for (const file of files) {
+          const relativePath = (file as any).webkitRelativePath;
+          if (!relativePath) continue;
+          
+          const parts = relativePath.split('/');
+          const folderPath = parts.slice(0, -1).join('/');
+          const targetFolderId = folderMap.get(folderPath) || rootFolder.id;
+          
+          // Upload file to its target folder
+          await uploadMultipleFiles([file], targetFolderId);
+        }
+        
+        // Refresh the folder hierarchy
+        await fetchFolderHierarchy();
+      } catch (error) {
+        console.error('Failed to upload folder structure:', error);
+        // Fallback to simple upload
+        uploadMultipleFiles(files);
       }
     },
-    [uploadMultipleFiles]
+    [createFolder, uploadMultipleFiles, fetchFolderHierarchy]
   );
 
   const toggleExpand = (nodeId: string) => {
@@ -204,8 +272,36 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     });
   };
 
-  const handleNodeClick = async (node: TreeNode) => {
-    setSelectedId(node.id);
+  const handleNodeClick = (e: React.MouseEvent, node: TreeNode) => {
+    e.stopPropagation();
+    
+    // Multi-select with Ctrl/Cmd key
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(node.id)) {
+          newSet.delete(node.id);
+        } else {
+          newSet.add(node.id);
+        }
+        return newSet;
+      });
+    } else {
+      // Single selection
+      setSelectedIds(new Set([node.id]));
+    }
+  };
+
+  const handleNodeDoubleClick = (node: TreeNode) => {
+    if (node.type === 'folder') {
+      toggleExpand(node.id);
+    } else if (node.type === 'file') {
+      // Open the file
+      handleOpenFile(node);
+    }
+  };
+
+  const handleOpenFile = async (node: TreeNode) => {
     if (node.type === 'file' && node.storage_path && onFileSelect) {
       const url = await getFileUrl(node.storage_path);
       if (url) {
@@ -214,14 +310,99 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     }
   };
 
-  const handleNodeDoubleClick = (node: TreeNode) => {
-    if (node.type === 'folder') {
-      toggleExpand(node.id);
-    } else {
-      // Double-click on file to rename
-      setRenameTarget({ id: node.id, name: node.name, type: node.type });
-      setRenameModalOpen(true);
+  const showContextMenu = (e: React.MouseEvent, node: TreeNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ nodeId: node.id, x: e.clientX, y: e.clientY });
+    setSelectedIds(new Set([node.id]));
+  };
+
+  const hideContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    if (contextMenu) {
+      document.addEventListener('click', hideContextMenu);
+      return () => document.removeEventListener('click', hideContextMenu);
     }
+  }, [contextMenu]);
+
+  const handleContextMenuAction = async (action: 'open' | 'rename' | 'delete', nodeId: string) => {
+    const node = findNodeById(treeData, nodeId);
+    if (!node) return;
+
+    hideContextMenu();
+
+    switch (action) {
+      case 'open':
+        if (node.type === 'file') {
+          handleOpenFile(node);
+        } else {
+          toggleExpand(node.id);
+        }
+        break;
+      case 'rename':
+        setRenameTarget({ id: node.id, name: node.name, type: node.type });
+        setRenameModalOpen(true);
+        break;
+      case 'delete':
+        try {
+          if (node.type === 'file') {
+            if (!node.storage_path) {
+              console.error('File has no storage path');
+              return;
+            }
+            await deleteFile(node.id, node.storage_path);
+          } else {
+            await deleteFolder(node.id);
+          }
+          await fetchFolderHierarchy();
+        } catch (error) {
+          console.error('Failed to delete:', error);
+        }
+        break;
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    try {
+      // Delete all selected items
+      const deletePromises: Promise<void>[] = [];
+      
+      for (const id of selectedIds) {
+        const node = findNodeById(treeData, id);
+        if (!node) continue;
+        
+        if (node.type === 'file') {
+          if (!node.storage_path) {
+            console.error('File has no storage path:', node.name);
+            continue;
+          }
+          deletePromises.push(deleteFile(id, node.storage_path));
+        } else {
+          deletePromises.push(deleteFolder(id));
+        }
+      }
+      
+      await Promise.all(deletePromises);
+      setSelectedIds(new Set()); // Clear selection
+      await fetchFolderHierarchy();
+    } catch (error) {
+      console.error('Failed to delete selected items:', error);
+    }
+  };
+
+  const findNodeById = (nodes: TreeNode[], id: string): TreeNode | null => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNodeById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
   const handleRename = async (newName: string) => {
@@ -277,14 +458,15 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
 
   const renderTreeNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedIds.has(node.id);
-    const isSelected = selectedId === node.id;
+    const isSelected = selectedIds.has(node.id);
     const isDragOver = dragOverFolderId === node.id;
+    const isHovered = hoveredNodeId === node.id;
     const hasChildren = node.children && node.children.length > 0;
 
     return (
       <div key={node.id}>
         <div
-          className={`flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors ${
+          className={`flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors relative group ${
             isSelected 
               ? 'bg-blue-100' 
               : isDragOver
@@ -296,8 +478,11 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
             backgroundColor: isDragOver ? 'var(--primary)' : isSelected ? 'rgba(0, 102, 204, 0.1)' : 'transparent',
             color: 'var(--text-primary)',
           }}
-          onClick={() => handleNodeClick(node)}
+          onClick={(e) => handleNodeClick(e, node)}
           onDoubleClick={() => handleNodeDoubleClick(node)}
+          onContextMenu={(e) => showContextMenu(e, node)}
+          onMouseEnter={() => setHoveredNodeId(node.id)}
+          onMouseLeave={() => setHoveredNodeId(null)}
           draggable={true}
           onDragStart={(e) => handleDragStart(e, node)}
           onDragOver={(e) => handleDragOver(e, node)}
@@ -328,6 +513,14 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
             </>
           )}
           <span className="text-sm truncate flex-1">{node.name}</span>
+          {/* Three-dot menu button */}
+          <button
+            onClick={(e) => showContextMenu(e, node)}
+            className={`p-1 hover:bg-gray-300 rounded transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            title="More options"
+          >
+            <MoreVertical size={12} style={{ color: 'var(--text-secondary)' }} />
+          </button>
         </div>
         {node.type === 'folder' && isExpanded && hasChildren && (
           <div>
@@ -373,6 +566,25 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
           </label>
         </div>
       </div>
+
+      {/* Selection Toolbar */}
+      {selectedIds.size > 1 && (
+        <div className="px-3 py-2 bg-blue-50 border-b flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+          <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+            {selectedIds.size} items selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDeleteSelected}
+              className="px-2 py-1 text-xs flex items-center gap-1 hover:bg-red-100 transition-colors text-red-700"
+              title="Delete selected"
+            >
+              <Trash2 size={12} />
+              Delete All
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tree View */}
       <div className="flex-1 overflow-auto">
@@ -450,6 +662,36 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
         defaultValue={renameTarget?.name || ''}
         placeholder="New name"
       />
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-white border shadow-lg rounded py-1 z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => handleContextMenuAction('open', contextMenu.nodeId)}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Open
+          </button>
+          <button
+            onClick={() => handleContextMenuAction('rename', contextMenu.nodeId)}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Rename
+          </button>
+          <button
+            onClick={() => handleContextMenuAction('delete', contextMenu.nodeId)}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors text-red-600"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
