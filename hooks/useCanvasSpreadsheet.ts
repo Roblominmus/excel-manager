@@ -10,11 +10,9 @@ import * as XLSX from 'xlsx';
 interface FortuneCellData {
   r: number;
   c: number;
-  v: {
-    v: unknown;
-    m: string;
-    [key: string]: unknown;
-  } | unknown;
+  // Broaden to align with Fortune Sheet's expected Cell type
+  // and avoid incompatible 'unknown' unions during Sheet typing.
+  v: any;
 }
 
 export function useCanvasSpreadsheet() {
