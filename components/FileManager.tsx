@@ -31,8 +31,6 @@ export default function FileManager({ userId: providedUserId, currentFolderId, o
     loading,
     error,
     createFolder,
-    deleteFile,
-    deleteFolder,
     getFilesInFolder,
     getFileUrl,
     fetchFolderHierarchy,

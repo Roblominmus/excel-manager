@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { SpreadsheetData } from '@/types/spreadsheet';
 import { DataGrid, Column } from 'react-data-grid';
-import { Download, Save } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useSpreadsheet } from '@/hooks/useSpreadsheet';
 import 'react-data-grid/lib/styles.css';
 
@@ -14,7 +14,7 @@ interface SpreadsheetEditorProps {
 }
 
 export default function SpreadsheetEditor({ fileUrl, onDataLoaded, onDataChange }: SpreadsheetEditorProps) {
-  const { data, loading, error, updateCell, exportToExcel } = useSpreadsheet(fileUrl);
+  const { data, loading, error, exportToExcel } = useSpreadsheet(fileUrl);
   
   // Notify parent when data is loaded
   useEffect(() => {
